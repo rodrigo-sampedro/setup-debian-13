@@ -1,0 +1,27 @@
+---
+# roles/fail2ban/handlers/main.yml
+# Fail2ban service handlers
+
+- name: restart fail2ban
+  systemd:
+    name: fail2ban
+    state: restarted
+  listen: restart fail2ban
+
+- name: reload fail2ban
+  systemd:
+    name: fail2ban
+    state: reloaded
+  listen: reload fail2ban
+
+- name: stop fail2ban
+  systemd:
+    name: fail2ban
+    state: stopped
+  listen: stop fail2ban
+
+- name: start fail2ban
+  systemd:
+    name: fail2ban
+    state: started
+  listen: start fail2ban

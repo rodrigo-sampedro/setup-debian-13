@@ -20,7 +20,7 @@ DRY_RUN=false
 
 # --- SSH ---
 SSH_PORT=2222
-SSH_ALLOWED_USERS=( "administrator" "deployer" "tuUser" )
+SSH_ALLOWED_USERS=( "administrator" "deployer" "ropnom" )
 SSH_MAX_AUTH_TRIES=3
 SSH_MAX_SESSIONS=2
 SSH_CLIENT_ALIVE_INTERVAL=300
@@ -31,20 +31,21 @@ SSH_CLIENT_ALIVE_COUNT_MAX=2
 USERS=(
   "administrator:passStrong:"
   "deployer:pass&:"
-  "tuUser:pass:"
+  "ropnom:ckpleple38:"
 )
 
 # --- SUDO POLICIES ---
 # Format: username:rule
 SUDO_RULES=(
   "administrator:ALL=(ALL) NOPASSWD:ALL"
-  "tuUser:ALL=(ALL) ALL"
+  "ropnom:ALL=(ALL) ALL"
   "deployer:ALL=(ALL) NOPASSWD:/usr/local/bin/docker-deploy,/usr/local/bin/docker-manage"
 )
 
 # --- FIREWALL ---
 FIREWALL_ALLOWED_PORTS=(
   "${SSH_PORT}/tcp"
+  "22/tcp"
   "80/tcp"
   "443/tcp"
 )
@@ -241,7 +242,7 @@ check_os() {
 show_configuration() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║           CONFIGURATION SUMMARY                            ║"
+  log "║           CONFIGURATION SUMMARY                           ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   log ""
   log "SSH Configuration:"
@@ -834,7 +835,7 @@ configure_ssh_banner() {
   
   cat > "$SSH_BANNER_FILE" << 'EOF'
 ╔═══════════════════════════════════════════════════════════════╗
-║                    AUTHORIZED ACCESS ONLY                      ║
+║                    AUTHORIZED ACCESS ONLY                     ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 WARNING: This system is for authorized users only. 
@@ -1364,7 +1365,7 @@ generate_documentation() {
   
   cat > "$doc_file" << EOF
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                    DEBIAN 13 VPS SETUP DOCUMENTATION                       ║
+║                    DEBIAN 13 VPS SETUP DOCUMENTATION                      ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Setup Date: $(date '+%Y-%m-%d %H:%M:%S')
@@ -1595,7 +1596,7 @@ final_security_check() {
 restart_and_validate_services() {
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                  RESTARTING AND VALIDATING SERVICES                       ║"
+  log "║                RESTARTING AND VALIDATING SERVICES                     ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   
@@ -1639,7 +1640,7 @@ restart_and_validate_services() {
   
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    SERVICE VALIDATION COMPLETE                            ║"
+  log "║                    SERVICE VALIDATION COMPLETE                        ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   log "⚠️  IMPORTANT: Test SSH connection now!"
@@ -1653,7 +1654,7 @@ restart_and_validate_services() {
 check_fail2ban() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  FAIL2BAN STATUS                                           ║"
+  log "║                 FAIL2BAN STATUS                           ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if ! command_exists fail2ban-client; then
@@ -1676,7 +1677,7 @@ check_fail2ban() {
 check_ssh_logins() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  RECENT SSH LOGINS (last 24h)                              ║"
+  log "║              RECENT SSH LOGINS (last 24h                  ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if journalctl -u ssh --since "24 hours ago" 2>/dev/null | grep -q "Accepted"; then
@@ -1693,7 +1694,7 @@ check_ssh_logins() {
 check_disk_usage() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  DISK USAGE                                                ║"
+  log "║  DISK USAGE                                               ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   df -h / /var 2>/dev/null | awk 'NR==1 || NR>1 {printf "  %-20s %8s %8s %8s %5s\n", $6, $2, $3, $4, $5}'
@@ -1703,7 +1704,7 @@ check_disk_usage() {
 check_memory_usage() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  MEMORY USAGE                                              ║"
+  log "║  MEMORY USAGE                                             ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   free -h | awk '
@@ -1717,7 +1718,7 @@ check_memory_usage() {
 check_docker_status() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  DOCKER STATUS                                             ║"
+  log "║  DOCKER STATUS                                            ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if ! command_exists docker; then
@@ -1745,7 +1746,7 @@ check_docker_status() {
 check_firewall_status() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  FIREWALL STATUS                                           ║"
+  log "║  FIREWALL STATUS                                          ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if command_exists ufw; then
@@ -1759,7 +1760,7 @@ check_firewall_status() {
 check_security_updates() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  SECURITY UPDATES                                          ║"
+  log "║  SECURITY UPDATES                                         ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   apt update &>/dev/null
@@ -1778,7 +1779,7 @@ check_security_updates() {
 check_security_services() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  SECURITY SERVICES                                         ║"
+  log "║  SECURITY SERVICES                                        ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   # Check endlessh
@@ -1837,7 +1838,7 @@ run_checks() {
 run_setup() {
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    STARTING VPS SETUP & HARDENING                         ║"
+  log "║                STARTING VPS SETUP & HARDENING                         ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   
@@ -1870,7 +1871,7 @@ run_setup() {
 
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    ✓ PHASE 1 COMPLETED SUCCESSFULLY                       ║"
+  log "║                ✓ PHASE 1 COMPLETED SUCCESSFULLY                       ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   log "📄 Documentation: /root/SETUP_INFO.txt"
@@ -1938,8 +1939,8 @@ main_menu() {
     clear
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════════════╗"
-    echo "║                   Debian 13 VPS Init & Hardening                          ║"
-    echo "║                           Version 1.1                                     ║"
+    echo "║                 Debian 13 VPS Init & Hardening                        ║"
+    echo "║                         Version 1.1                                   ║"
     echo "╚═══════════════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  1) 🚀 Run full setup & hardening"

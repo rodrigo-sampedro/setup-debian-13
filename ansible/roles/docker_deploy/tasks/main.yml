@@ -1,0 +1,57 @@
+---
+# roles/docker_deploy/tasks/main.yml
+# Docker deployment helper scripts and directory setup
+
+- name: Create Docker helper scripts
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - { src: 'docker-deploy.sh.j2', dest: '/usr/local/bin/docker-deploy' }
+    - { src: 'docker-manage.sh.j2', dest: '/usr/local/bin/docker-manage' }
+
+- name: Create Docker projects base directory
+  file:
+    path: "{{ docker_deploy_base_dir }}"
+    state: directory
+    owner: root
+    group: "{{ docker_deploy_group }}"
+    mode: '2775'
+
+- name: Create Docker projects subdirectories
+  file:
+    path: "{{ docker_deploy_base_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: "{{ docker_deploy_group }}"
+    mode: '2775'
+  loop:
+    - .env
+    - volumes
+
+- name: Create Docker projects README
+  template:
+    src: docker-readme.md.j2
+    dest: "{{ docker_deploy_base_dir }}/README.md"
+    owner: root
+    group: "{{ docker_deploy_group }}"
+    mode: '0664'
+
+- name: Verify docker-deploy scripts are executable
+  file:
+    path: "{{ item }}"
+    mode: '0755'
+  loop:
+    - /usr/local/bin/docker-deploy
+    - /usr/local/bin/docker-manage
+
+- name: Display Docker deployment configuration
+  debug:
+    msg:
+      - "Docker deployment configured"
+      - "Deploy group: {{ docker_deploy_group }}"
+      - "Projects directory: {{ docker_deploy_base_dir }}"
+      - "Helper commands: docker-deploy (dp), docker-manage (dm)"

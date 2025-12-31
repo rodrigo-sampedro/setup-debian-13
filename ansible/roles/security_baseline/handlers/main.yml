@@ -1,0 +1,21 @@
+---
+# roles/security_baseline/handlers/main.yml
+# Security baseline handlers
+
+- name: apply sysctl
+  command: sysctl --system
+  listen: apply sysctl
+
+- name: reload sysctl
+  command: sysctl -p /etc/sysctl.d/99-hardening.conf
+  listen: reload sysctl
+
+- name: restart auditd
+  service:
+    name: auditd
+    state: restarted
+  listen: restart auditd
+
+- name: reload auditd
+  command: service auditd reload
+  listen: reload auditd

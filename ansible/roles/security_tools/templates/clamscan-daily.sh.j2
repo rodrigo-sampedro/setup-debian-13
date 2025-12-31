@@ -1,0 +1,28 @@
+#!/bin/bash
+# roles/security_tools/templates/clamscan-daily.sh.j2
+# Daily ClamAV scan script
+# Managed by Ansible
+
+LOG_FILE="/var/log/clamav/daily-scan.log"
+SCAN_DIRS="{{ clamav_scan_dirs | join(' ') }}"
+
+echo "=== ClamAV Daily Scan Started: $(date) ===" >> "$LOG_FILE"
+
+clamscan -r -i \
+{% for exclude in clamav_exclude_dirs %}
+    --exclude-dir="{{ exclude }}" \
+{% endfor %}
+    $SCAN_DIRS >> "$LOG_FILE" 2>&1
+
+SCAN_RESULT=$?
+
+echo "=== ClamAV Daily Scan Finished: $(date) ===" >> "$LOG_FILE"
+echo "Exit code: $SCAN_RESULT" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+
+# Send alert if malware found (exit code 1)
+if [ $SCAN_RESULT -eq 1 ]; then
+    echo "WARNING: ClamAV found infected files!" | logger -t clamav-scan
+fi
+
+exit 0

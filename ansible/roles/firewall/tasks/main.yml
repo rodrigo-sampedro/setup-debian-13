@@ -1,0 +1,49 @@
+---
+# roles/firewall/tasks/main.yml
+# UFW firewall configuration
+
+- name: Reset UFW to default state
+  ufw:
+    state: reset
+  when: not ansible_check_mode
+
+- name: Set UFW default policies
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+
+- name: Enable UFW logging
+  ufw:
+    logging: 'on'
+
+- name: Configure SSH port with rate limiting
+  ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "SSH with rate limiting"
+
+- name: Allow firewall ports
+  ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] }}"
+    comment: "Allowed by Ansible playbook"
+  loop: "{{ firewall_allowed_ports }}"
+  when: "item != (ssh_port ~ '/tcp')"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Get UFW status
+  command: ufw status verbose
+  register: ufw_status
+  changed_when: false
+
+- name: Display firewall configuration
+  debug:
+    msg: "{{ ufw_status.stdout_lines }}"

@@ -1,0 +1,52 @@
+---
+# roles/preflight/tasks/main.yml
+# Pre-flight checks and backup
+
+- name: Check if running as root
+  assert:
+    that: ansible_user_uid == 0 or ansible_become
+    fail_msg: "Must run with become/sudo privileges"
+    success_msg: "Superuser privileges confirmed"
+
+- name: Gather system facts
+  setup:
+    gather_subset:
+      - all
+
+- name: Display system information
+  debug:
+    msg:
+      - "Hostname: {{ ansible_hostname }}"
+      - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Kernel: {{ ansible_kernel }}"
+      - "Architecture: {{ ansible_architecture }}"
+      - "Memory: {{ ansible_memtotal_mb }} MB"
+      - "CPUs: {{ ansible_processor_vcpus }}"
+
+- name: Create backup directory
+  file:
+    path: "{{ backup_dir }}"
+    state: directory
+    mode: '0700'
+    owner: root
+    group: root
+
+- name: Backup critical configuration files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ backup_dir }}/{{ item | basename }}"
+    remote_src: yes
+    mode: preserve
+  loop: "{{ backup_files }}"
+  when: item is file
+  ignore_errors: yes
+
+- name: Create backup manifest
+  template:
+    src: backup_manifest.j2
+    dest: "{{ backup_dir }}/BACKUP_MANIFEST.txt"
+    mode: '0600'
+
+- name: Log backup completion
+  debug:
+    msg: "Configuration backup created in {{ backup_dir }}"

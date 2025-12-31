@@ -1,0 +1,83 @@
+---
+# roles/users/tasks/main.yml
+# User management and SSH keys
+
+- name: Create docker_deploy group
+  group:
+    name: "{{ docker_deploy_group }}"
+    state: present
+
+- name: Create system users
+  user:
+    name: "{{ item.name }}"
+    password: "{{ item.password | password_hash('sha512') }}"
+    groups: "{{ item.groups | default([]) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    create_home: yes
+    state: present
+  loop: "{{ system_users }}"
+  no_log: yes
+
+- name: Setup SSH directories
+  file:
+    path: "/home/{{ item.name }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0700'
+  loop: "{{ system_users }}"
+
+- name: Download SSH keys from URL
+  get_url:
+    url: "{{ item.ssh_key_url }}"
+    dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0600'
+  loop: "{{ system_users }}"
+  when: 
+    - item.ssh_key_url is defined
+    - item.ssh_key_url | length > 0
+    - item.ssh_key_url.startswith('http')
+
+- name: Copy SSH keys from file
+  copy:
+    src: "{{ item.ssh_key_url }}"
+    dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0600'
+  loop: "{{ system_users }}"
+  when: 
+    - item.ssh_key_url is defined
+    - item.ssh_key_url | length > 0
+    - not item.ssh_key_url.startswith('http')
+
+- name: Configure sudo policies
+  template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ item.user }}"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  loop: "{{ sudo_policies }}"
+
+- name: Setup Docker aliases for users
+  blockinfile:
+    path: "/home/{{ item.name }}/.bashrc"
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0644'
+    marker: "# {mark} ANSIBLE MANAGED - Docker aliases"
+    block: |
+      # Docker helper aliases
+      alias dp='docker-deploy'
+      alias dm='docker-manage'
+      
+      # Show last login
+      if [ -f ~/.last_login ]; then
+          echo "Last login: $(cat ~/.last_login)"
+      fi
+      echo "$(date '+%Y-%m-%d %H:%M:%S from '$(echo $SSH_CONNECTION | awk '{print $1}'))" > ~/.last_login
+  loop: "{{ system_users }}"

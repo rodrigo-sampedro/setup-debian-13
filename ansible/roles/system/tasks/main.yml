@@ -1,0 +1,232 @@
+---
+# roles/system/tasks/main.yml
+# System configuration: timezone, locale, APT, swap
+
+- name: Set system hostname
+  hostname:
+    name: "{{ inventory_hostname_short }}"
+  when: inventory_hostname_short is defined
+
+- name: Configure timezone
+  timezone:
+    name: "{{ system_timezone }}"
+  notify: reload timezone
+
+- name: Ensure locale package is installed
+  apt:
+    name: locales
+    state: present
+    update_cache: yes
+
+- name: Configure locales
+  locale_gen:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ system_locales }}"
+  register: locale_gen_result
+
+- name: Set default locale
+  lineinfile:
+    path: /etc/default/locale
+    regexp: '^LANG='
+    line: "LANG={{ system_locales[0] }}"
+    create: yes
+  when: system_locales | length > 0
+
+- name: Update locale
+  command: update-locale LANG={{ system_locales[0] }}
+  when: 
+    - locale_gen_result is changed
+    - system_locales | length > 0
+
+- name: Backup APT sources
+  copy:
+    src: /etc/apt/sources.list.d/debian.sources
+    dest: /etc/apt/sources.list.d/debian.sources.bak
+    remote_src: yes
+    force: no
+  ignore_errors: yes
+
+- name: Configure APT sources (contrib, non-free)
+  lineinfile:
+    path: /etc/apt/sources.list.d/debian.sources
+    regexp: '^Components:'
+    line: 'Components: main contrib non-free non-free-firmware'
+    backup: yes
+  register: apt_sources_updated
+
+- name: Update APT cache
+  apt:
+    update_cache: yes
+    cache_valid_time: "{{ apt_update_cache_valid_time | default(3600) }}"
+
+- name: Check for available upgrades
+  shell: apt list --upgradable 2>/dev/null | grep -v "^Listing" | wc -l
+  register: upgradable_packages
+  changed_when: false
+  failed_when: false
+
+- name: Display upgrade information
+  debug:
+    msg: "{{ upgradable_packages.stdout }} package(s) available for upgrade"
+  when: upgradable_packages.stdout is defined
+
+- name: Perform full system upgrade
+  apt:
+    upgrade: full
+    autoremove: "{{ apt_autoremove | default(yes) }}"
+    autoclean: "{{ apt_autoclean | default(yes) }}"
+  when: perform_full_upgrade | default(true)
+  register: system_upgrade
+  async: 3600
+  poll: 10
+
+- name: Display upgrade results
+  debug:
+    msg: "System upgrade completed. {{ system_upgrade.stdout_lines | default([]) | length }} packages updated"
+  when: system_upgrade is changed
+
+- name: Install mandatory packages
+  apt:
+    name: "{{ mandatory_packages }}"
+    state: present
+    update_cache: yes
+    install_recommends: "{{ install_recommended | default(no) }}"
+    install_suggests: "{{ install_suggests | default(no) }}"
+
+- name: Check if swap file exists
+  stat:
+    path: "{{ swap_file }}"
+  register: swap_file_stat
+
+- name: Check if swap is active
+  shell: swapon --show | grep -q "{{ swap_file }}"
+  register: swap_active
+  failed_when: false
+  changed_when: false
+
+- name: Get current swap configuration
+  command: swapon --show
+  register: current_swap
+  changed_when: false
+
+- name: Display current swap status
+  debug:
+    msg: "{{ current_swap.stdout_lines if current_swap.stdout_lines | length > 0 else 'No swap currently active' }}"
+
+- name: Disable existing swap if present but not configured correctly
+  command: swapoff "{{ swap_file }}"
+  when: 
+    - swap_file_stat.stat.exists
+    - swap_active.rc != 0
+  ignore_errors: yes
+
+- name: Remove old swap file if needed
+  file:
+    path: "{{ swap_file }}"
+    state: absent
+  when: 
+    - swap_file_stat.stat.exists
+    - swap_active.rc != 0
+
+- name: Check available disk space for swap
+  shell: df -BG {{ swap_file | dirname }} | tail -1 | awk '{print $4}' | sed 's/G//'
+  register: available_space
+  changed_when: false
+
+- name: Verify sufficient space for swap
+  assert:
+    that:
+      - available_space.stdout | int > (swap_size | regex_replace('G', '') | int)
+    fail_msg: "Insufficient disk space for {{ swap_size }} swap file"
+    success_msg: "Sufficient space available for swap file"
+  when: available_space.stdout is defined
+
+- name: Create swap file using fallocate
+  command: fallocate -l "{{ swap_size }}" "{{ swap_file }}"
+  args:
+    creates: "{{ swap_file }}"
+  when: not swap_file_stat.stat.exists or swap_active.rc != 0
+  register: swap_created_fallocate
+  failed_when: false
+
+- name: Create swap file using dd (fallback)
+  command: dd if=/dev/zero of="{{ swap_file }}" bs=1M count={{ swap_size | regex_replace('G', '') | int * 1024 }}
+  args:
+    creates: "{{ swap_file }}"
+  when: 
+    - swap_created_fallocate is failed
+    - not swap_file_stat.stat.exists or swap_active.rc != 0
+
+- name: Set swap file permissions
+  file:
+    path: "{{ swap_file }}"
+    mode: '0600'
+    owner: root
+    group: root
+
+- name: Format swap file
+  command: mkswap "{{ swap_file }}"
+  when: swap_active.rc != 0
+  register: swap_formatted
+
+- name: Enable swap
+  command: swapon "{{ swap_file }}"
+  when: swap_active.rc != 0
+  register: swap_enabled
+
+- name: Check if swap is in fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ swap_file }}"
+    state: absent
+  check_mode: yes
+  register: swap_in_fstab
+  changed_when: false
+
+- name: Add swap to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ swap_file }} none swap sw 0 0"
+    state: present
+    backup: yes
+  when: swap_in_fstab is not changed
+
+- name: Configure swappiness
+  sysctl:
+    name: vm.swappiness
+    value: "{{ default_swappiness | default(10) }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-swappiness.conf
+    reload: yes
+
+- name: Verify swap is active
+  command: swapon --show
+  register: swap_status
+  changed_when: false
+
+- name: Display final swap status
+  debug:
+    msg: 
+      - "Swap configuration completed"
+      - "{{ swap_status.stdout_lines }}"
+      - "Swappiness: {{ default_swappiness | default(10) }}"
+
+- name: Clean up package cache
+  apt:
+    autoclean: yes
+    autoremove: yes
+  when: apt_autoclean | default(true)
+
+- name: Display system configuration summary
+  debug:
+    msg:
+      - "═══════════════════════════════════════"
+      - "System Configuration Summary"
+      - "═══════════════════════════════════════"
+      - "Timezone: {{ system_timezone }}"
+      - "Locales: {{ system_locales | join(', ') }}"
+      - "Swap: {{ swap_size }} at {{ swap_file }}"
+      - "Packages upgraded: {{ 'Yes' if system_upgrade is changed else 'No' }}"
+      - "Mandatory packages: Installed"
+      - "═══════════════════════════════════════"

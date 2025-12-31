@@ -1,0 +1,66 @@
+#!/bin/bash
+# roles/docker_deploy/templates/docker-manage.sh.j2
+# Safe Docker management script
+# Managed by Ansible
+
+set -e
+
+case "$1" in
+  ps)
+    shift
+    docker ps "$@"
+    ;;
+  images)
+    docker images
+    ;;
+  prune)
+    echo "Pruning unused Docker resources..."
+    docker system prune -f
+    ;;
+  stats)
+    docker stats --no-stream
+    ;;
+  logs)
+    shift
+    if [ -z "$1" ]; then
+      echo "Error: Container name required"
+      echo "Usage: $0 logs <container_name>"
+      exit 1
+    fi
+    docker logs "$@"
+    ;;
+  exec)
+    shift
+    if [ -z "$1" ]; then
+      echo "Error: Container name required"
+      echo "Usage: $0 exec <container_name> [command]"
+      exit 1
+    fi
+    docker exec -it "$@"
+    ;;
+  inspect)
+    shift
+    docker inspect "$@"
+    ;;
+  *)
+    echo "Docker Management Script"
+    echo ""
+    echo "Usage: $0 {ps|images|prune|stats|logs|exec|inspect}"
+    echo ""
+    echo "Commands:"
+    echo "  ps         - List running containers"
+    echo "  images     - List Docker images"
+    echo "  prune      - Remove unused Docker resources"
+    echo "  stats      - Show resource usage statistics"
+    echo "  logs       - View container logs"
+    echo "  exec       - Execute command in container"
+    echo "  inspect    - Display detailed container info"
+    echo ""
+    echo "Examples:"
+    echo "  $0 ps -a"
+    echo "  $0 logs mycontainer"
+    echo "  $0 exec mycontainer /bin/bash"
+    echo "  $0 stats"
+    exit 1
+    ;;
+esac

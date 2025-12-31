@@ -1,0 +1,69 @@
+---
+# roles/maintenance/tasks/main.yml
+# Automatic updates and system maintenance
+
+- name: Ensure unattended-upgrades is installed
+  apt:
+    name:
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+
+- name: Configure unattended-upgrades
+  template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+
+- name: Configure automatic update intervals
+  copy:
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Configure logrotate for custom logs
+  copy:
+    content: |
+      {{ log_dir }}/*.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+      }
+      
+      /var/log/init_phase1.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+      }
+    dest: /etc/logrotate.d/custom-apps
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable unattended-upgrades
+  systemd:
+    name: unattended-upgrades
+    state: started
+    enabled: yes
+
+- name: Display maintenance configuration
+  debug:
+    msg:
+      - "Automatic security updates enabled"
+      - "Update check: Daily"
+      - "Upgrade: Automatic"
+      - "Autoclean: Weekly"

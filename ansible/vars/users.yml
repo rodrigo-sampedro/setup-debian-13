@@ -1,0 +1,60 @@
+---
+# vars/users.yml - User management configuration
+
+# SSH Allowed Users
+ssh_allowed_users:
+  - administrator
+  - deployer
+  - tuUser
+
+# Users to Create
+# Password can be:
+#   - Plain text (will be hashed)
+#   - Pre-hashed (starts with $6$ for SHA-512)
+#   - Vault encrypted variable name
+system_users:
+  - name: administrator
+    password: "{{ vault_administrator_password | default('passStrong') }}"
+    groups:
+      - "{{ docker_deploy_group }}"
+      - sudo
+    ssh_key_url: ""
+    shell: /bin/bash
+    
+  - name: deployer
+    password: "{{ vault_deployer_password | default('pass&') }}"
+    groups:
+      - "{{ docker_deploy_group }}"
+    ssh_key_url: ""
+    shell: /bin/bash
+    
+  - name: tuUser
+    password: "{{ vault_tuuser_password | default('pass') }}"
+    groups:
+      - "{{ docker_deploy_group }}"
+    ssh_key_url: ""
+    shell: /bin/bash
+
+# Sudo Policies
+# sudoers_policy options:
+#   - ALL: full sudo access with password
+#   - NOPASSWD_ALL: full sudo without password
+#   - DOCKER_ONLY: only docker helper scripts
+sudo_policies:
+  - user: administrator
+    policy: NOPASSWD_ALL
+    
+  - user: deployer
+    policy: DOCKER_ONLY
+    commands:
+      - /usr/local/bin/docker-deploy
+      - /usr/local/bin/docker-manage
+    
+  - user: tuUser
+    policy: ALL
+
+# Sudo rule templates
+sudo_templates:
+  ALL: "ALL=(ALL) ALL"
+  NOPASSWD_ALL: "ALL=(ALL) NOPASSWD:ALL"
+  DOCKER_ONLY: "ALL=(ALL) NOPASSWD:{{ item.commands | join(',') }}"

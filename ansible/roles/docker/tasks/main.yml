@@ -1,0 +1,94 @@
+---
+# roles/docker/tasks/main.yml
+# Docker installation and configuration
+
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_installed
+  failed_when: false
+  changed_when: false
+
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+  when: docker_installed.rc != 0
+
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  when: docker_installed.rc != 0
+
+- name: Add Docker GPG key
+  shell: |
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+  when: docker_installed.rc != 0
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+  when: docker_installed.rc != 0
+
+- name: Update APT cache after adding Docker repo
+  apt:
+    update_cache: yes
+  when: docker_installed.rc != 0
+
+- name: Install Docker packages
+  apt:
+    name: "{{ docker_packages }}"
+    state: present
+  when: docker_installed.rc != 0
+
+- name: Ensure Docker config directory exists
+  file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure Docker daemon for security
+  copy:
+    content: "{{ docker_daemon_config | to_nice_json }}"
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart docker
+
+- name: Start and enable Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Verify Docker installation
+  command: docker run --rm hello-world
+  register: docker_test
+  changed_when: false
+  failed_when: false
+
+- name: Display Docker version
+  command: docker --version
+  register: docker_version
+  changed_when: false
+
+- name: Show Docker installation status
+  debug:
+    msg:
+      - "Docker installed successfully"
+      - "{{ docker_version.stdout }}"

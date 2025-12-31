@@ -1,0 +1,49 @@
+---
+# roles/security_tools/tasks/rkhunter.yml
+# Rkhunter rootkit detection configuration
+
+- name: Update rkhunter database
+  command: rkhunter --update
+  changed_when: false
+  register: rkhunter_update
+  failed_when: false
+
+- name: Initialize rkhunter properties
+  command: rkhunter --propupd
+  changed_when: false
+  register: rkhunter_propupd
+
+- name: Configure rkhunter settings
+  lineinfile:
+    path: /etc/rkhunter.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^MAIL-ON-WARNING=', line: 'MAIL-ON-WARNING=""' }
+    - { regexp: '^UPDATE_MIRRORS=', line: 'UPDATE_MIRRORS={{ rkhunter_update_mirrors }}' }
+    - { regexp: '^MIRRORS_MODE=', line: 'MIRRORS_MODE={{ rkhunter_mirrors_mode }}' }
+
+- name: Create rkhunter weekly scan script
+  template:
+    src: rkhunter-weekly.sh.j2
+    dest: /usr/local/bin/rkhunter-weekly
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Schedule weekly rkhunter scan
+  cron:
+    name: "Rkhunter weekly scan"
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    job: "/usr/local/bin/rkhunter-weekly"
+    user: root
+
+- name: Display rkhunter configuration
+  debug:
+    msg:
+      - "Rkhunter configured"
+      - "Weekly scans: {{ rkhunter_scan_time }}"
+      - "Update mirrors: {{ rkhunter_update_mirrors }}"

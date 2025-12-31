@@ -1,0 +1,11 @@
+# roles/security_baseline/templates/hardening.rules.j2
+# Auditd hardening rules
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+{% for rule_group in auditd_rules %}
+# {{ rule_group.name | upper }}
+{% for rule in rule_group.rules %}
+{{ rule }}
+{% endfor %}
+
+{% endfor %}

@@ -1,0 +1,92 @@
+---
+# roles/validation/tasks/security_check.yml
+# Final security validation checks
+
+- name: Check SSH service status
+  systemd:
+    name: ssh
+  register: ssh_status
+
+- name: Check UFW firewall status
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+
+- name: Check fail2ban status
+  systemd:
+    name: fail2ban
+  register: fail2ban_status
+
+- name: Check Docker status
+  systemd:
+    name: docker
+  register: docker_status
+  failed_when: false
+
+- name: Check swap status
+  command: swapon --show
+  register: swap_status
+  changed_when: false
+
+- name: Check if docker_deploy group exists
+  command: getent group "{{ docker_deploy_group }}"
+  register: deploy_group_check
+  changed_when: false
+  failed_when: false
+
+- name: Check endlessh status
+  systemd:
+    name: endlessh
+  register: endlessh_status
+  failed_when: false
+
+- name: Check ClamAV daemon status
+  systemd:
+    name: clamav-daemon
+  register: clamav_status
+  failed_when: false
+
+- name: Check ClamAV freshclam status
+  systemd:
+    name: clamav-freshclam
+  register: clamav_freshclam_status
+  failed_when: false
+
+- name: Compile validation results
+  set_fact:
+    validation_results:
+      ssh: "{{ '✓ Active' if ssh_status.status.ActiveState == 'active' else '✗ Inactive' }}"
+      firewall: "{{ '✓ Active' if 'Status: active' in ufw_status.stdout else '✗ Inactive' }}"
+      fail2ban: "{{ '✓ Active' if fail2ban_status.status.ActiveState == 'active' else '✗ Inactive' }}"
+      docker: "{{ '✓ Active' if docker_status.status.ActiveState == 'active' else '✗ Not installed or inactive' }}"
+      swap: "{{ '✓ Active' if swap_status.stdout | length > 0 else '✗ Inactive' }}"
+      deploy_group: "{{ '✓ Exists' if deploy_group_check.rc == 0 else '✗ Missing' }}"
+      endlessh: "{{ '✓ Active' if endlessh_status.status.ActiveState == 'active' else '⚠ Inactive' }}"
+      clamav: "{{ '✓ Active' if clamav_status.status.ActiveState == 'active' else '⚠ Inactive' }}"
+
+- name: Display validation results
+  debug:
+    msg:
+      - "╔═══════════════════════════════════════════════════════════╗"
+      - "║           FINAL SECURITY VALIDATION                       ║"
+      - "╚═══════════════════════════════════════════════════════════╝"
+      - ""
+      - "SSH Service:        {{ validation_results.ssh }}"
+      - "Firewall (UFW):     {{ validation_results.firewall }}"
+      - "Fail2ban:           {{ validation_results.fail2ban }}"
+      - "Docker:             {{ validation_results.docker }}"
+      - "Swap:               {{ validation_results.swap }}"
+      - "Deploy Group:       {{ validation_results.deploy_group }}"
+      - "Endlessh Tarpit:    {{ validation_results.endlessh }}"
+      - "ClamAV:             {{ validation_results.clamav }}"
+      - ""
+      - "{{ '✓ All critical checks passed' if (validation_results.ssh.startswith('✓') and validation_results.firewall.startswith('✓') and validation_results.fail2ban.startswith('✓')) else '⚠ Some issues detected - review above' }}"
+
+- name: Fail if critical services are not running
+  assert:
+    that:
+      - ssh_status.status.ActiveState == "active"
+      - "'Status: active' in ufw_status.stdout"
+      - fail2ban_status.status.ActiveState == "active"
+    fail_msg: "Critical services are not running properly"
+    success_msg: "All critical services validated successfully"

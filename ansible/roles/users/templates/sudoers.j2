@@ -1,0 +1,14 @@
+# roles/users/templates/sudoers.j2
+# Sudo policy for {{ item.user }}
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+{% if item.policy == 'NOPASSWD_ALL' %}
+{{ item.user }} ALL=(ALL) NOPASSWD:ALL
+{% elif item.policy == 'ALL' %}
+{{ item.user }} ALL=(ALL) ALL
+{% elif item.policy == 'DOCKER_ONLY' %}
+{{ item.user }} ALL=(ALL) NOPASSWD:{{ item.commands | join(',') }}
+{% else %}
+# Custom policy
+{{ item.custom_rule | default('# No rule defined') }}
+{% endif %}
