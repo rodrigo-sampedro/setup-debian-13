@@ -1,0 +1,58 @@
+---
+# roles/security_tools/tasks/clamav.yml
+# ClamAV antivirus configuration
+
+- name: Stop clamav-freshclam for initial update
+  systemd:
+    name: clamav-freshclam
+    state: stopped
+  ignore_errors: yes
+
+- name: Update ClamAV virus definitions
+  command: freshclam
+  register: freshclam_update
+  failed_when: false
+  changed_when: "'updated' in freshclam_update.stdout.lower()"
+
+- name: Start and enable clamav-freshclam
+  systemd:
+    name: clamav-freshclam
+    state: started
+    enabled: yes
+
+- name: Start and enable clamav-daemon
+  systemd:
+    name: clamav-daemon
+    state: started
+    enabled: yes
+
+- name: Create ClamAV log directory
+  file:
+    path: /var/log/clamav
+    state: directory
+    owner: clamav
+    group: clamav
+    mode: '0755'
+
+- name: Create ClamAV daily scan script
+  template:
+    src: clamscan-daily.sh.j2
+    dest: /usr/local/bin/clamscan-daily
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Schedule daily ClamAV scan
+  cron:
+    name: "ClamAV daily scan"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/clamscan-daily"
+    user: root
+
+- name: Display ClamAV configuration
+  debug:
+    msg:
+      - "ClamAV configured"
+      - "Daily scans at: {{ clamav_scan_time }}"
+      - "Scan directories: {{ clamav_scan_dirs | join(', ') }}"

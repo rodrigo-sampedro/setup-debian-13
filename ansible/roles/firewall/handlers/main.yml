@@ -1,0 +1,24 @@
+---
+# roles/firewall/handlers/main.yml
+# UFW firewall handlers
+
+- name: reload ufw
+  ufw:
+    state: reloaded
+  listen: reload ufw
+
+- name: restart ufw
+  systemd:
+    name: ufw
+    state: restarted
+  listen: restart ufw
+
+- name: enable ufw
+  ufw:
+    state: enabled
+  listen: enable ufw
+
+- name: disable ufw
+  ufw:
+    state: disabled
+  listen: disable ufw

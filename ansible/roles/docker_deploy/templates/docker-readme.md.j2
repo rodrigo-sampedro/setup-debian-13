@@ -1,0 +1,135 @@
+# roles/docker_deploy/templates/docker-readme.md.j2
+# Docker Projects Directory
+
+This directory is shared among users in the '{{ docker_deploy_group }}' group.
+
+## 📁 Structure
+
+```
+{{ docker_deploy_base_dir }}/
+├── .env/           # Environment files for docker-compose
+├── volumes/        # Docker volumes data
+└── [projects]/     # Your project directories
+```
+
+## 🚀 Quick Start
+
+### Create a New Project
+
+```bash
+cd {{ docker_deploy_base_dir }}
+mkdir myproject
+cd myproject
+
+# Create docker-compose.yml
+vim docker-compose.yml
+```
+
+### Use Helper Commands
+
+The system provides two helper commands:
+- `dp` (docker-deploy) - Alias for docker-deploy
+- `dm` (docker-manage) - Alias for docker-manage
+
+## 📋 Docker Deploy Commands
+
+```bash
+# Start containers
+dp start docker-compose.yml
+
+# Stop containers
+dp stop docker-compose.yml
+
+# Restart containers
+dp restart docker-compose.yml
+
+# View logs
+dp logs docker-compose.yml
+
+# Pull latest images
+dp pull docker-compose.yml
+```
+
+## 🔧 Docker Manage Commands
+
+```bash
+# List running containers
+dm ps
+
+# List all containers (including stopped)
+dm ps -a
+
+# List images
+dm images
+
+# Clean unused resources
+dm prune
+
+# Show resource usage
+dm stats
+
+# View container logs
+dm logs container_name
+
+# Execute command in container
+dm exec container_name /bin/bash
+
+# Inspect container
+dm inspect container_name
+```
+
+## 📝 Example Project Structure
+
+```
+myproject/
+├── docker-compose.yml
+├── .env
+├── app/
+│   └── [your application files]
+└── volumes/
+    ├── db/
+    └── config/
+```
+
+## 🔒 Permissions
+
+- All members of '{{ docker_deploy_group }}' can read/write in this directory
+- Use appropriate file permissions for sensitive data
+- Store secrets in `.env` files (never commit to git)
+
+## 💡 Best Practices
+
+1. **Use docker-compose**: Always use docker-compose for multi-container apps
+2. **Environment files**: Store configuration in `.env` files
+3. **Named volumes**: Use named volumes for persistent data
+4. **Health checks**: Define health checks in your compose files
+5. **Resource limits**: Set CPU and memory limits
+6. **Logging**: Configure appropriate log drivers and rotation
+
+## 🆘 Troubleshooting
+
+### Check logs
+```bash
+dm logs -f container_name
+```
+
+### Restart a service
+```bash
+dp restart docker-compose.yml
+```
+
+### Clean up resources
+```bash
+dm prune
+```
+
+### Check container status
+```bash
+dm ps -a
+dm inspect container_name
+```
+
+---
+
+**Generated**: {{ ansible_date_time.iso8601 }}
+**Managed by**: Ansible

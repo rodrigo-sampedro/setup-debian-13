@@ -1,0 +1,35 @@
+# roles/security_baseline/templates/99-hardening.conf.j2
+# Kernel hardening parameters
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+# ═══════════════════════════════════════════════════════════════
+# Network Security
+# ═══════════════════════════════════════════════════════════════
+
+{% for key, value in sysctl_config.items() if key.startswith('net.') %}
+{{ key }} = {{ value }}
+{% endfor %}
+
+# ═══════════════════════════════════════════════════════════════
+# Kernel Security
+# ═══════════════════════════════════════════════════════════════
+
+{% for key, value in sysctl_config.items() if key.startswith('kernel.') %}
+{{ key }} = {{ value }}
+{% endfor %}
+
+# ═══════════════════════════════════════════════════════════════
+# Filesystem Security
+# ═══════════════════════════════════════════════════════════════
+
+{% for key, value in sysctl_config.items() if key.startswith('fs.') %}
+{{ key }} = {{ value }}
+{% endfor %}
+
+# ═══════════════════════════════════════════════════════════════
+# Virtual Memory
+# ═══════════════════════════════════════════════════════════════
+
+{% for key, value in sysctl_config.items() if key.startswith('vm.') %}
+{{ key }} = {{ value }}
+{% endfor %}

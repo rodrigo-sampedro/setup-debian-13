@@ -1,0 +1,112 @@
+---
+# site.yml - Main playbook for Debian 13 VPS Setup
+# Usage: ansible-playbook -i inventory/hosts site.yml
+# Dry-run: ansible-playbook -i inventory/hosts site.yml --check --diff
+# Specific tags: ansible-playbook -i inventory/hosts site.yml --tags "ssh,firewall"
+
+- name: Debian 13 VPS Setup & Hardening
+  hosts: vps_servers
+  become: yes
+  gather_facts: yes
+  
+  vars_files:
+    - vars/main.yml
+    - vars/users.yml
+    - vars/security.yml
+  
+  pre_tasks:
+    - name: Verify OS is Debian 13
+      assert:
+        that:
+          - ansible_distribution == "Debian"
+          - ansible_distribution_major_version == "13"
+        fail_msg: "This playbook requires Debian 13"
+        success_msg: "Debian 13 detected - proceeding"
+      tags: always
+
+    - name: Create log directory
+      file:
+        path: /var/log/ansible-vps-setup
+        state: directory
+        mode: '0755'
+      tags: always
+
+    - name: Display configuration summary
+      debug:
+        msg:
+          - "=== CONFIGURATION SUMMARY ==="
+          - "SSH Port: {{ ssh_port }}"
+          - "Allowed Users: {{ ssh_allowed_users | join(', ') }}"
+          - "Blocked Countries: {{ blocked_countries | join(', ') }}"
+          - "Firewall Ports: {{ firewall_allowed_ports | join(', ') }}"
+          - "Docker Deploy Group: {{ docker_deploy_group }}"
+          - "Timezone: {{ system_timezone }}"
+      tags: always
+      when: not ansible_check_mode
+
+  roles:
+    - role: preflight
+      tags: ['preflight', 'backup']
+      
+    - role: system
+      tags: ['system', 'timezone', 'locale', 'swap']
+      
+    - role: security_baseline
+      tags: ['security', 'sysctl', 'auditd']
+      
+    - role: users
+      tags: ['users', 'sudo']
+      
+    - role: ssh
+      tags: ['ssh', 'security']
+      
+    - role: firewall
+      tags: ['firewall', 'ufw']
+      
+    - role: fail2ban
+      tags: ['fail2ban', 'security']
+      
+    - role: geoip
+      tags: ['geoip', 'security']
+      
+    - role: docker
+      tags: ['docker']
+      
+    - role: docker_deploy
+      tags: ['docker', 'docker_deploy']
+      
+    - role: security_tools
+      tags: ['security', 'clamav', 'rkhunter', 'endlessh']
+      
+    - role: maintenance
+      tags: ['maintenance', 'updates']
+      
+    - role: documentation
+      tags: ['documentation']
+
+  post_tasks:
+    - name: Run final security checks
+      include_role:
+        name: validation
+        tasks_from: security_check
+      tags: ['always']
+
+    - name: Display completion message
+      debug:
+        msg:
+          - "==================================================="
+          - "✓ VPS Setup & Hardening completed successfully!"
+          - "==================================================="
+          - ""
+          - "📄 Documentation: /root/SETUP_INFO.txt"
+          - "📋 Logs: /var/log/ansible-vps-setup/"
+          - ""
+          - "⚠️  IMPORTANT: Test SSH on port {{ ssh_port }} before disconnecting!"
+          - "   Connection: ssh -p {{ ssh_port }} user@{{ ansible_host }}"
+          - ""
+          - "Next steps:"
+          - "  1. Test SSH connection on new port"
+          - "  2. Run fortress hardening (optional)"
+          - "  3. Deploy your Docker applications"
+      tags: always
+      when: not ansible_check_mode

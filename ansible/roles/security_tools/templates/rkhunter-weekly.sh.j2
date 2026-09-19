@@ -1,0 +1,22 @@
+#!/bin/bash
+# roles/security_tools/templates/rkhunter-weekly.sh.j2
+# Weekly rkhunter and chkrootkit scan script
+# Managed by Ansible
+
+LOG_FILE="/var/log/rkhunter-weekly.log"
+
+echo "=== Rkhunter Weekly Scan Started: $(date) ===" >> "$LOG_FILE"
+rkhunter --check --skip-keypress --report-warnings-only >> "$LOG_FILE" 2>&1
+echo "=== Rkhunter Weekly Scan Finished: $(date) ===" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+
+# Also run chkrootkit
+echo "=== Chkrootkit Weekly Scan Started: $(date) ===" >> "$LOG_FILE"
+chkrootkit >> "$LOG_FILE" 2>&1
+echo "=== Chkrootkit Weekly Scan Finished: $(date) ===" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+
+# Log to syslog
+logger -t rkhunter-scan "Weekly rootkit scan completed"
+
+exit 0

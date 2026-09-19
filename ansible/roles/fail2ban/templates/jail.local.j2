@@ -1,0 +1,31 @@
+# roles/fail2ban/templates/jail.local.j2
+# Fail2ban configuration
+# Managed by Ansible
+
+[DEFAULT]
+bantime = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+backend = {{ fail2ban_backend }}
+action = {{ fail2ban_action }}
+
+# Email notifications (optional)
+# destemail = admin@example.com
+# sender = fail2ban@{{ ansible_hostname }}
+# sendername = Fail2Ban
+
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = {{ fail2ban_maxretry }}
+bantime = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+
+# Docker protection (optional)
+# [docker-auth]
+# enabled = false
+# filter = docker-auth
+# logpath = /var/log/docker.log
+# maxretry = 5

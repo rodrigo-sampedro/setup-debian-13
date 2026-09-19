@@ -1,0 +1,71 @@
+---
+# roles/security_tools/tasks/endlessh.yml
+# Endlessh SSH tarpit configuration
+
+- name: Install endlessh
+  apt:
+    name: endlessh
+    state: present
+
+- name: Create endlessh config directory
+  file:
+    path: /etc/endlessh
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure endlessh
+  template:
+    src: endlessh.conf.j2
+    dest: /etc/endlessh/config
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart endlessh
+
+- name: Create systemd override directory for endlessh
+  file:
+    path: /etc/systemd/system/endlessh.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure endlessh systemd override for port 22
+  copy:
+    content: |
+      [Service]
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      PrivateUsers=false
+    dest: /etc/systemd/system/endlessh.service.d/override.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart endlessh
+
+- name: Set capabilities on endlessh binary
+  capabilities:
+    path: /usr/bin/endlessh
+    capability: cap_net_bind_service+ep
+    state: present
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start endlessh
+  systemd:
+    name: endlessh
+    state: started
+    enabled: yes
+
+- name: Display endlessh configuration
+  debug:
+    msg:
+      - "Endlessh SSH tarpit configured"
+      - "Port: {{ endlessh_port }}"
+      - "Delay: {{ endlessh_delay }}ms"
+      - "Max clients: {{ endlessh_max_clients }}"

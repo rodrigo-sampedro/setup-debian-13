@@ -1,0 +1,36 @@
+all:
+  children:
+    localhost:
+      vars:
+        ansible_python_interpreter: "/home/ropnom/Documentos/GitHub/vps-cloud-setup/ansible/ansible_env/bin/python"
+    setup:
+      hosts:
+        # cloud-vps-server:
+        #   ansible_host: vps-21fb4d5b.vps.ovh.net
+        #   ansible_port: 22014
+        #   ansible_user: debian
+        #   ansible_password: ChloeSZ2Años&
+        #   disable_root: true
+        #   domain: programing.es
+        # atico-server:
+        #   ansible_host: 192.168.1.63
+        #   ansible_port: 22
+        #   ansible_user: ropnom
+        #   ansible_password: ckpleple38&
+        #   disable_root: true
+        #   domain: atico.atayo.com.es
+        atico-server:
+          ansible_host: 192.168.1.63
+          ansible_port: 22014
+          ansible_user: deployer
+          disable_root: true
+          domain: atico.atayo.com.es
+    servers:
+      hosts:
+        # programing-server:
+        #   ansible_host: programing.es
+        #   ansible_port: 22014
+        #   ansible_user: deployer
+        #   ansible_ssh_private_key_file: "./ssh-keys/id_rsa_ansible"
+        #   disable_root: true
+        #   domain: programing.es

@@ -1,0 +1,119 @@
+---
+# roles/ssh/tasks/main.yml
+# SSH hardening configuration
+
+- name: Create SSH banner
+  copy:
+    content: |
+      ╔═══════════════════════════════════════════════════════════════╗
+      ║                    AUTHORIZED ACCESS ONLY                      ║
+      ╚═══════════════════════════════════════════════════════════════╝
+
+      WARNING: This system is for authorized users only. 
+
+      All activities on this system are monitored and recorded. Unauthorized 
+      access attempts will be prosecuted to the fullest extent of the law.
+
+      By continuing, you acknowledge that:
+      - You have explicit authorization to access this system
+      - Your actions will be logged and may be audited
+      - Unauthorized access is a criminal offense
+
+      If you are not an authorized user, disconnect immediately.
+
+      ═══════════════════════════════════════════════════════════════════
+
+    dest: "{{ ssh_banner_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Backup current sshd_config
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: "/etc/ssh/sshd_config.bak.{{ ansible_date_time.epoch }}"
+    remote_src: yes
+    mode: preserve
+
+- name: Configure SSH hardening settings
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+    backup: yes
+  loop:
+    - { regexp: '^#?Port\s', line: "Port {{ ssh_port }}" }
+    - { regexp: '^#?PermitRootLogin\s', line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication\s', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?PubkeyAuthentication\s', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?PermitEmptyPasswords\s', line: 'PermitEmptyPasswords no' }
+    - { regexp: '^#?MaxAuthTries\s', line: "MaxAuthTries {{ ssh_max_auth_tries }}" }
+    - { regexp: '^#?MaxSessions\s', line: "MaxSessions {{ ssh_max_sessions }}" }
+    - { regexp: '^#?ClientAliveInterval\s', line: "ClientAliveInterval {{ ssh_client_alive_interval }}" }
+    - { regexp: '^#?ClientAliveCountMax\s', line: "ClientAliveCountMax {{ ssh_client_alive_count_max }}" }
+    - { regexp: '^#?X11Forwarding\s', line: 'X11Forwarding no' }
+    - { regexp: '^#?AllowTcpForwarding\s', line: 'AllowTcpForwarding no' }
+    - { regexp: '^#?AllowAgentForwarding\s', line: 'AllowAgentForwarding no' }
+    - { regexp: '^#?PermitTunnel\s', line: 'PermitTunnel no' }
+    - { regexp: '^#?Banner\s', line: "Banner {{ ssh_banner_file }}" }
+  notify: restart ssh
+
+- name: Configure SSH cryptography - Ciphers
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?Ciphers\s'
+    line: "Ciphers {{ ssh_ciphers | join(',') }}"
+    state: present
+  notify: restart ssh
+
+- name: Configure SSH cryptography - MACs
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?MACs\s'
+    line: "MACs {{ ssh_macs | join(',') }}"
+    state: present
+  notify: restart ssh
+
+- name: Configure SSH cryptography - KexAlgorithms
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?KexAlgorithms\s'
+    line: "KexAlgorithms {{ ssh_kex_algorithms | join(',') }}"
+    state: present
+  notify: restart ssh
+
+- name: Remove any existing AllowUsers directive
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AllowUsers\s'
+    state: absent
+  notify: restart ssh
+
+- name: Set AllowUsers directive
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "AllowUsers {{ ssh_allowed_users | join(' ') }}"
+    state: present
+  notify: restart ssh
+
+- name: Ensure /run/sshd directory exists
+  file:
+    path: /run/sshd
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Validate sshd configuration
+  command: sshd -t
+  changed_when: false
+  register: sshd_validation
+
+- name: Display SSH configuration status
+  debug:
+    msg:
+      - "SSH Configuration Applied"
+      - "Port: {{ ssh_port }}"
+      - "Allowed Users: {{ ssh_allowed_users | join(', ') }}"
+      - "⚠️  IMPORTANT: Test SSH on port {{ ssh_port }} before closing session!"

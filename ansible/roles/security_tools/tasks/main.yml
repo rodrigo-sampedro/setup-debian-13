@@ -1,0 +1,164 @@
+---
+# roles/security_tools/tasks/main.yml
+# Install and configure security tools: ClamAV, Rkhunter, Endlessh
+
+- name: Include ClamAV tasks
+  include_tasks: clamav.yml
+  tags: clamav
+
+- name: Include Rkhunter tasks
+  include_tasks: rkhunter.yml
+  tags: rkhunter
+
+- name: Include Endlessh tasks
+  include_tasks: endlessh.yml
+  tags: endlessh
+
+# ===== clamav.yml =====
+# Create as: roles/security_tools/tasks/clamav.yml
+#
+# - name: Stop clamav-freshclam for initial update
+#   systemd:
+#     name: clamav-freshclam
+#     state: stopped
+# 
+# - name: Update ClamAV virus definitions
+#   command: freshclam
+#   register: freshclam_update
+#   failed_when: false
+#   changed_when: "'updated' in freshclam_update.stdout.lower()"
+# 
+# - name: Start and enable clamav-freshclam
+#   systemd:
+#     name: clamav-freshclam
+#     state: started
+#     enabled: yes
+# 
+# - name: Start and enable clamav-daemon
+#   systemd:
+#     name: clamav-daemon
+#     state: started
+#     enabled: yes
+# 
+# - name: Create ClamAV scan script
+#   template:
+#     src: clamscan-daily.sh.j2
+#     dest: /usr/local/bin/clamscan-daily
+#     owner: root
+#     group: root
+#     mode: '0755'
+# 
+# - name: Create ClamAV log directory
+#   file:
+#     path: /var/log/clamav
+#     state: directory
+#     owner: clamav
+#     group: clamav
+#     mode: '0755'
+# 
+# - name: Schedule daily ClamAV scan
+#   cron:
+#     name: "ClamAV daily scan"
+#     minute: "0"
+#     hour: "2"
+#     job: "/usr/local/bin/clamscan-daily"
+#     user: root
+
+# ===== rkhunter.yml =====
+# Create as: roles/security_tools/tasks/rkhunter.yml
+#
+# - name: Update rkhunter database
+#   command: rkhunter --update
+#   changed_when: false
+# 
+# - name: Initialize rkhunter properties
+#   command: rkhunter --propupd
+#   changed_when: false
+# 
+# - name: Configure rkhunter
+#   lineinfile:
+#     path: /etc/rkhunter.conf
+#     regexp: "{{ item.regexp }}"
+#     line: "{{ item.line }}"
+#     backup: yes
+#   loop:
+#     - { regexp: '^MAIL-ON-WARNING=', line: 'MAIL-ON-WARNING=""' }
+#     - { regexp: '^UPDATE_MIRRORS=', line: 'UPDATE_MIRRORS={{ rkhunter_update_mirrors }}' }
+#     - { regexp: '^MIRRORS_MODE=', line: 'MIRRORS_MODE={{ rkhunter_mirrors_mode }}' }
+# 
+# - name: Create rkhunter weekly scan script
+#   template:
+#     src: rkhunter-weekly.sh.j2
+#     dest: /usr/local/bin/rkhunter-weekly
+#     owner: root
+#     group: root
+#     mode: '0755'
+# 
+# - name: Schedule weekly rkhunter scan
+#   cron:
+#     name: "Rkhunter weekly scan"
+#     minute: "0"
+#     hour: "3"
+#     weekday: "0"
+#     job: "/usr/local/bin/rkhunter-weekly"
+#     user: root
+
+# ===== endlessh.yml =====
+# Create as: roles/security_tools/tasks/endlessh.yml
+#
+# - name: Install endlessh
+#   apt:
+#     name: endlessh
+#     state: present
+# 
+# - name: Create endlessh config directory
+#   file:
+#     path: /etc/endlessh
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: '0755'
+# 
+# - name: Configure endlessh
+#   template:
+#     src: endlessh.conf.j2
+#     dest: /etc/endlessh/config
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   notify: restart endlessh
+# 
+# - name: Create systemd override directory for endlessh
+#   file:
+#     path: /etc/systemd/system/endlessh.service.d
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: '0755'
+# 
+# - name: Configure endlessh systemd override for port 22
+#   copy:
+#     content: |
+#       [Service]
+#       AmbientCapabilities=CAP_NET_BIND_SERVICE
+#       PrivateUsers=false
+#     dest: /etc/systemd/system/endlessh.service.d/override.conf
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   notify:
+#     - reload systemd
+#     - restart endlessh
+# 
+# - name: Set capabilities on endlessh binary
+#   capabilities:
+#     path: /usr/bin/endlessh
+#     capability: cap_net_bind_service+ep
+#     state: present
+# 
+# - name: Enable and start endlessh
+#   systemd:
+#     name: endlessh
+#     state: started
+#     enabled: yes
+#     daemon_reload: yes

@@ -1,0 +1,13 @@
+---
+# requirements.yml
+# Ansible Galaxy requirements (collections)
+
+collections:
+  - name: community.general
+    version: ">=8.0.0"
+  
+  - name: ansible.posix
+    version: ">=1.5.0"
+
+# To install these collections, run:
+# ansible-galaxy collection install -r requirements.yml

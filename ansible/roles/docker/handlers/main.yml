@@ -1,0 +1,34 @@
+---
+# roles/docker/handlers/main.yml
+# Docker service handlers
+
+- name: restart docker
+  systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+  listen: restart docker
+
+- name: reload docker
+  systemd:
+    name: docker
+    state: reloaded
+  listen: reload docker
+
+- name: stop docker
+  systemd:
+    name: docker
+    state: stopped
+  listen: stop docker
+
+- name: start docker
+  systemd:
+    name: docker
+    state: started
+  listen: start docker
+
+- name: enable docker
+  systemd:
+    name: docker
+    enabled: yes
+  listen: enable docker

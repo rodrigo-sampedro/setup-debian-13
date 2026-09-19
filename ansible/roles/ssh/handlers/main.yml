@@ -1,0 +1,26 @@
+---
+# roles/ssh/handlers/main.yml
+# SSH service handlers
+
+- name: restart ssh
+  systemd:
+    name: ssh
+    state: restarted
+  listen: restart ssh
+
+- name: reload ssh
+  systemd:
+    name: ssh
+    state: reloaded
+  listen: reload ssh
+
+- name: validate sshd config
+  command: sshd -t
+  listen: validate sshd config
+
+- name: restart sshd
+  systemd:
+    name: sshd
+    state: restarted
+  listen: restart sshd
+  ignore_errors: yes

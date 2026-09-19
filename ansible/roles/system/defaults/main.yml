@@ -1,0 +1,25 @@
+---
+# roles/system/defaults/main.yml
+# Default variables for system role (can be overridden in vars/)
+
+# Timezone
+default_timezone: "UTC"
+
+# Locales
+default_locales:
+  - en_US.UTF-8
+
+# Swap configuration
+default_swap_size: "2G"
+default_swap_file: "/swapfile"
+default_swappiness: 10
+
+# APT configuration
+apt_update_cache_valid_time: 3600
+apt_autoremove: yes
+apt_autoclean: yes
+
+# Package management
+perform_full_upgrade: yes
+install_recommended: no
+install_suggests: no

@@ -1,0 +1,22 @@
+# roles/maintenance/templates/50unattended-upgrades.j2
+# Unattended upgrades configuration
+# Managed by Ansible
+
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Debian,codename=${distro_codename},label=Debian-Security";
+    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+
+// Email notifications (optional)
+// Unattended-Upgrade::Mail "admin@example.com";
+// Unattended-Upgrade::MailOnlyOnError "true";
+
+// Logging
+Unattended-Upgrade::SyslogEnable "true";
+Unattended-Upgrade::SyslogFacility "daemon";

@@ -1,0 +1,129 @@
+---
+# vars/security.yml - Security hardening configuration
+
+# Geo-blocking
+blocked_countries:
+  - CN  # China
+  - RU  # Russia
+  - KP  # North Korea
+  - IR  # Iran
+  - PK  # Pakistan
+  - BY  # Belarus
+
+# Fail2ban Configuration
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 3
+fail2ban_backend: systemd
+fail2ban_action: "%(action_mwl)s"
+
+# Sysctl Kernel Hardening
+sysctl_config:
+  # Network Security
+  net.ipv4.ip_forward: 1
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.tcp_syncookies: 1
+  net.ipv4.tcp_timestamps: 0
+  
+  # IPv6 Disable
+  net.ipv6.conf.all.disable_ipv6: 1
+  net.ipv6.conf.default.disable_ipv6: 1
+  
+  # Kernel Security
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  kernel.yama.ptrace_scope: 2
+  kernel.unprivileged_userns_clone: 0
+  
+  # Filesystem
+  fs.suid_dumpable: 0
+  
+  # Memory
+  vm.swappiness: 10
+
+# Auditd Rules
+auditd_rules:
+  - name: identity
+    rules:
+      - "-w /etc/passwd -p wa -k identity"
+      - "-w /etc/group -p wa -k identity"
+      - "-w /etc/shadow -p wa -k identity"
+      - "-w /etc/sudoers -p wa -k sudoers"
+      - "-w /etc/sudoers.d/ -p wa -k sudoers"
+  
+  - name: sshd
+    rules:
+      - "-w /etc/ssh/sshd_config -p wa -k sshd"
+  
+  - name: docker
+    rules:
+      - "-w /usr/bin/docker -p x -k docker"
+      - "-w /var/lib/docker -p wa -k docker"
+  
+  - name: root_commands
+    rules:
+      - "-a always,exit -F arch=b64 -S execve -F euid=0 -k root_commands"
+
+# ClamAV Configuration
+clamav_scan_dirs:
+  - /home
+  - /root
+  - /opt
+clamav_scan_time: "0 2 * * *"  # Daily at 2 AM
+clamav_exclude_dirs:
+  - "^/sys"
+  - "^/proc"
+  - "^/dev"
+
+# Rkhunter Configuration
+rkhunter_scan_time: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+rkhunter_update_mirrors: 1
+rkhunter_mirrors_mode: 0
+
+# SSH Hardening - Cryptography
+ssh_ciphers:
+  - chacha20-poly1305@openssh.com
+  - aes256-gcm@openssh.com
+  - aes128-gcm@openssh.com
+  - aes256-ctr
+  - aes192-ctr
+  - aes128-ctr
+
+ssh_macs:
+  - hmac-sha2-512-etm@openssh.com
+  - hmac-sha2-256-etm@openssh.com
+  - hmac-sha2-512
+  - hmac-sha2-256
+
+ssh_kex_algorithms:
+  - curve25519-sha256
+  - curve25519-sha256@libssh.org
+  - diffie-hellman-group16-sha512
+  - diffie-hellman-group18-sha512
+  - diffie-hellman-group-exchange-sha256
+
+# Endlessh (SSH Tarpit)
+endlessh_port: 22
+endlessh_delay: 10000
+endlessh_max_clients: 4096
+endlessh_max_line_length: 32
+endlessh_log_level: 1
+endlessh_bind_family: 0  # IPv4 only
+
+# Docker Daemon Security
+docker_daemon_config:
+  log-driver: "json-file"
+  log-opts:
+    max-size: "10m"
+    max-file: "3"
+  default-ulimits:
+    nofile:
+      Name: "nofile"
+      Hard: 64000
+      Soft: 64000
+  live-restore: true
+  userland-proxy: false
+  no-new-privileges: true

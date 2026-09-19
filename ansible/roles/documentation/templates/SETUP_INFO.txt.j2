@@ -1,0 +1,123 @@
+# roles/documentation/templates/SETUP_INFO.txt.j2
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    DEBIAN 13 VPS SETUP DOCUMENTATION                       ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Setup Date: {{ ansible_date_time.iso8601 }}
+Hostname: {{ ansible_hostname }}
+IP Address: {{ ansible_default_ipv4.address }}
+Operating System: {{ ansible_distribution }} {{ ansible_distribution_version }}
+Kernel: {{ ansible_kernel }}
+
+═══════════════════════════════════════════════════════════════════════════
+SSH CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════
+SSH Port: {{ ssh_port }}
+Allowed Users: {{ ssh_allowed_users | join(', ') }}
+Password Authentication: DISABLED
+Root Login: DISABLED
+Login Banner: ENABLED
+
+⚠️  IMPORTANT: Connect using: ssh -p {{ ssh_port }} user@{{ ansible_default_ipv4.address }}
+
+═══════════════════════════════════════════════════════════════════════════
+SECURITY FEATURES
+═══════════════════════════════════════════════════════════════════════════
+✓ Fail2ban: ENABLED (SSH protection on port {{ ssh_port }})
+✓ GeoIP Blocking: ENABLED (Countries: {{ blocked_countries | join(', ') }})
+✓ SSH Tarpit (endlessh): Port {{ endlessh_port }}
+✓ UFW Firewall: ENABLED
+✓ Auditd: ENABLED (monitoring /etc, sudo, docker)
+✓ Unattended Security Updates: ENABLED
+✓ Kernel Hardening: Applied (sysctl)
+✓ ClamAV: Daily scans at {{ clamav_scan_time }}
+✓ Rkhunter/Chkrootkit: Weekly scans
+
+═══════════════════════════════════════════════════════════════════════════
+FIREWALL (UFW)
+═══════════════════════════════════════════════════════════════════════════
+Status: ENABLED
+Allowed Ports: {{ firewall_allowed_ports | join(', ') }}
+SSH Rate Limiting: ENABLED (port {{ ssh_port }})
+
+═══════════════════════════════════════════════════════════════════════════
+DOCKER
+═══════════════════════════════════════════════════════════════════════════
+Docker Deploy Group: {{ docker_deploy_group }}
+Projects Directory: {{ docker_deploy_base_dir }}
+
+Helper Scripts:
+  - docker-deploy (alias: dp) - Deploy and manage compose files
+  - docker-manage (alias: dm) - Manage containers and images
+
+Helper Commands:
+  dp start <compose-file>   - Start containers
+  dp stop <compose-file>    - Stop containers
+  dp restart <compose-file> - Restart containers
+  dp logs <compose-file>    - View logs
+  dp pull <compose-file>    - Pull latest images
+  
+  dm ps                     - List containers
+  dm images                 - List images
+  dm prune                  - Clean unused resources
+  dm stats                  - Show resource usage
+  dm logs <container>       - View container logs
+
+═══════════════════════════════════════════════════════════════════════════
+SYSTEM CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════
+Timezone: {{ system_timezone }}
+Swap: {{ swap_size }} at {{ swap_file }}
+Locales: {{ system_locales | join(', ') }}
+
+═══════════════════════════════════════════════════════════════════════════
+USERS CREATED
+═══════════════════════════════════════════════════════════════════════════
+{% for user in system_users %}
+  - {{ user.name }} (member of {{ docker_deploy_group }})
+{% endfor %}
+
+═══════════════════════════════════════════════════════════════════════════
+BACKUP INFORMATION
+═══════════════════════════════════════════════════════════════════════════
+Configuration backups location: {{ backup_dir }}
+Ansible log directory: {{ log_dir }}
+
+═══════════════════════════════════════════════════════════════════════════
+SCHEDULED TASKS
+═══════════════════════════════════════════════════════════════════════════
+ClamAV: {{ clamav_scan_time }}
+Rkhunter: {{ rkhunter_scan_time }}
+
+═══════════════════════════════════════════════════════════════════════════
+ADDITIONAL HARDENING
+═══════════════════════════════════════════════════════════════════════════
+Fortress hardening script: {{ fortress_script_path }}
+
+To apply additional hardening, run:
+  cd /root
+  ./fortress_improved.sh -l high -n --explain
+
+═══════════════════════════════════════════════════════════════════════════
+NEXT STEPS
+═══════════════════════════════════════════════════════════════════════════
+1. Test SSH connection on port {{ ssh_port }} BEFORE closing this session
+2. Run additional hardening: ./fortress_improved.sh -l high -n --explain
+3. Deploy Docker containers in {{ docker_deploy_base_dir }}
+4. Configure monitoring/alerting as needed
+
+═══════════════════════════════════════════════════════════════════════════
+USEFUL COMMANDS
+═══════════════════════════════════════════════════════════════════════════
+Check Fail2ban status:  fail2ban-client status sshd
+Check firewall status:  ufw status verbose
+Check Docker status:    dm ps
+View audit logs:        ausearch -k docker
+View system logs:       journalctl -xe
+Check ClamAV logs:      tail -f /var/log/clamav/daily-scan.log
+
+Docker aliases (available after login):
+  dp - docker-deploy
+  dm - docker-manage
+
+═══════════════════════════════════════════════════════════════════════════

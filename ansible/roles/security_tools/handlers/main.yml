@@ -1,0 +1,38 @@
+---
+# roles/security_tools/handlers/main.yml
+# Security tools handlers
+
+- name: restart endlessh
+  systemd:
+    name: endlessh
+    state: restarted
+  listen: restart endlessh
+
+- name: restart clamav-daemon
+  systemd:
+    name: clamav-daemon
+    state: restarted
+  listen: restart clamav-daemon
+
+- name: restart clamav-freshclam
+  systemd:
+    name: clamav-freshclam
+    state: restarted
+  listen: restart clamav-freshclam
+
+- name: stop clamav-freshclam
+  systemd:
+    name: clamav-freshclam
+    state: stopped
+  listen: stop clamav-freshclam
+
+- name: start clamav-freshclam
+  systemd:
+    name: clamav-freshclam
+    state: started
+  listen: start clamav-freshclam
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+  listen: reload systemd

@@ -1,0 +1,16 @@
+---
+# roles/system/handlers/main.yml
+# System configuration handlers
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+  listen: reload systemd
+
+- name: update grub
+  command: update-grub
+  listen: update grub
+
+- name: reload timezone
+  command: timedatectl set-timezone {{ system_timezone }}
+  listen: reload timezone

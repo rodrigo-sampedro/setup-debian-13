@@ -1,0 +1,21 @@
+# roles/security_tools/templates/endlessh.conf.j2
+# Endlessh SSH tarpit configuration
+# Managed by Ansible
+
+# Port to bind to (default 2222, we use {{ endlessh_port }} as honeypot)
+Port {{ endlessh_port }}
+
+# Delay in milliseconds between sending bytes
+Delay {{ endlessh_delay }}
+
+# Maximum number of clients to accept at once
+MaxClients {{ endlessh_max_clients }}
+
+# Maximum line length
+MaxLineLength {{ endlessh_max_line_length }}
+
+# Log level (0 = quiet, 1 = standard, 2 = verbose)
+LogLevel {{ endlessh_log_level }}
+
+# Bind family (0 = IPv4 only, 1 = IPv6 only, 2 = both)
+BindFamily {{ endlessh_bind_family }}

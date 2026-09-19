@@ -1,0 +1,15 @@
+# roles/geoip/templates/geoip-action.conf.j2
+# GeoIP action for fail2ban
+# Managed by Ansible
+
+[Definition]
+actionstart =
+actionstop =
+actioncheck =
+actionban = COUNTRY=$(geoiplookup <ip> | awk -F ": " '{print $2}' | awk -F "," '{print $1}')
+            if echo "{{ blocked_countries | join(' ') }}" | grep -q "$COUNTRY"; then
+                iptables -I INPUT -s <ip> -j DROP
+            fi
+actionunban = iptables -D INPUT -s <ip> -j DROP
+
+[Init]
