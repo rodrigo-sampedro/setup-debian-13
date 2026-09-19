@@ -89,6 +89,18 @@ show_configuration() {
   log ""
 }
 
+set_or_add() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+
+  if grep -Eq "^#?\s*${key}\b" "$file"; then
+    sed -i "s|^#\?\s*${key}.*|${key} ${value}|" "$file"
+  else
+    echo "${key} ${value}" >> "$file"
+  fi
+}
+
 ask_confirmation() {
   if $DRY_RUN; then
     ok "DRY-RUN mode: skipping confirmation"

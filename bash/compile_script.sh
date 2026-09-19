@@ -58,7 +58,7 @@ cat > "$OUTPUT_FILE" << 'HEADER'
 # Description       : Debian 13 Setup VPS Users, ssh, fail2ban ufw and docker
 # Author            : Rodrigo Sampedro Casis
 # Creation date     : 2025-12-26
-# Version           : 1.1
+# Version           : 1.0
 # Usage             : ./setup_debian13.sh [--no-menu] [--dry-run]
 #===============================================================================
 set -Eeuo pipefail
