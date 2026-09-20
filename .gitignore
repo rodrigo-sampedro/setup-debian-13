@@ -1,2 +1,12 @@
 ansible_env/
 
+# Local infrastructure state and secrets
+ansible/inventory/hosts.local.yaml
+ansible/vars/*.local.yml
+ansible/vars/vault.yml
+ansible/.vault_pass
+ansible/ansible.log
+ansible/retry/
+ansible/ansible_ssh_known_hosts
+ansible/ssh-keys/
+

@@ -1,0 +1,37 @@
+---
+# Safe defaults for the Debian 13 reference server.
+# Host-specific values belong in inventory or encrypted Vault variables.
+
+system_timezone: UTC
+ssh_port: 22
+ssh_banner_file: /etc/ssh/banner
+ssh_max_auth_tries: 3
+ssh_max_sessions: 2
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+
+firewall_allowed_ports:
+  - "{{ ssh_port }}/tcp"
+
+backup_dir: /var/backups/ansible-vps-setup
+backup_files:
+  - /etc/ssh/sshd_config
+  - /etc/sudoers
+  - /etc/fail2ban/jail.local
+  - /etc/docker/daemon.json
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_deploy_group: docker_deploy
+docker_deploy_base_dir: /opt/docker-projects
+
+# Bootstrap is intentionally non-destructive to SSH until a second-session
+# key verification has been completed by the operator.
+bootstrap_mode: true
+ssh_keys_verified: false
+ssh_hardening_enabled: false
+bootstrap_deployer_root: true

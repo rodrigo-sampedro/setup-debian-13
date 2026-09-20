@@ -47,8 +47,8 @@ check_requirements() {
         exit 1
     fi
     
-    if [ ! -f "inventory/hosts" ]; then
-        echo -e "${RED}Error: inventory/hosts not found.${NC}"
+    if [ ! -f "inventory/hosts.yaml" ]; then
+        echo -e "${RED}Error: inventory/hosts.yaml not found.${NC}"
         exit 1
     fi
     
@@ -58,12 +58,12 @@ check_requirements() {
 
 dry_run() {
     echo -e "${YELLOW}Running dry-run (check mode)...${NC}"
-    ansible-playbook -i inventory/hosts site.yml --check --diff --ask-vault-pass
+    ansible-playbook -i inventory/hosts.yaml site.yml --check --diff --ask-vault-pass --ask-pass
 }
 
 execute_playbook() {
     echo -e "${YELLOW}Executing playbook...${NC}"
-    ansible-playbook -i inventory/hosts site.yml --ask-vault-pass
+    ansible-playbook -i inventory/hosts.yaml site.yml --ask-vault-pass --ask-pass
 }
 
 execute_with_tags() {
@@ -76,24 +76,24 @@ execute_with_tags() {
     fi
     
     echo -e "${YELLOW}Executing with tags: $tags${NC}"
-    ansible-playbook -i inventory/hosts site.yml --tags "$tags" --ask-vault-pass
+    ansible-playbook -i inventory/hosts.yaml site.yml --tags "$tags" --ask-vault-pass --ask-pass
 }
 
 list_tags() {
     echo -e "${YELLOW}Available tags:${NC}"
     echo ""
-    ansible-playbook -i inventory/hosts site.yml --list-tags 2>/dev/null | grep "TASK TAGS:" -A 100
+    ansible-playbook -i inventory/hosts.yaml site.yml --list-tags 2>/dev/null | grep "TASK TAGS:" -A 100
     echo ""
 }
 
 check_inventory() {
     echo -e "${YELLOW}Inventory hosts:${NC}"
     echo ""
-    ansible-inventory -i inventory/hosts --list
+    ansible-inventory -i inventory/hosts.yaml --list
     echo ""
     
     echo -e "${YELLOW}Testing connection...${NC}"
-    ansible -i inventory/hosts all -m ping
+    ansible -i inventory/hosts.yaml all -m ping --ask-pass
     echo ""
 }
 
@@ -131,7 +131,7 @@ manage_vault() {
 
 run_validation() {
     echo -e "${YELLOW}Running validation checks...${NC}"
-    ansible-playbook -i inventory/hosts site.yml --tags "validation" --ask-vault-pass
+    ansible-playbook -i inventory/hosts.yaml site.yml --tags "validation" --ask-vault-pass
 }
 
 full_setup() {

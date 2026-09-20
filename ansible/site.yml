@@ -13,8 +13,25 @@
     - vars/main.yml
     - vars/users.yml
     - vars/security.yml
+    - vars/vault.yml
   
   pre_tasks:
+    - name: Require deployer key before any SSH hardening
+      assert:
+        that:
+          - vault_deployer_authorized_keys is defined
+          - vault_deployer_authorized_keys | length > 0
+        fail_msg: "Provide deployer authorized keys through Vault before continuing."
+      tags: ['always', 'bootstrap', 'users']
+
+    - name: Require explicit key verification before SSH hardening
+      assert:
+        that:
+          - ssh_keys_verified | bool
+        fail_msg: "Set ssh_keys_verified=true only after verifying deployer key access from a second session."
+      when: ssh_hardening_enabled | bool
+      tags: ['always', 'ssh']
+
     - name: Verify OS is Debian 13
       assert:
         that:
@@ -55,10 +72,11 @@
       tags: ['security', 'sysctl', 'auditd']
       
     - role: users
-      tags: ['users', 'sudo']
+      tags: ['bootstrap', 'users', 'sudo']
       
     - role: ssh
       tags: ['ssh', 'security']
+      when: ssh_hardening_enabled | bool
       
     - role: firewall
       tags: ['firewall', 'ufw']

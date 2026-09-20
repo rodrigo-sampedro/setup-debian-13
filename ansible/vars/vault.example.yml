@@ -1,0 +1,12 @@
+---
+# Copy these keys into an encrypted vars/vault.yml.
+# Never commit the populated file or any plaintext credential.
+
+vault_deployer_authorized_keys:
+  - "ssh-ed25519 AAAA... operator@example.invalid"
+
+# Optional recovery key. administrator remains excluded from direct SSH.
+vault_administrator_authorized_keys: []
+
+# Only define password hashes when a documented local password is required.
+# vault_deployer_password_hash: "CHANGE_ME"
