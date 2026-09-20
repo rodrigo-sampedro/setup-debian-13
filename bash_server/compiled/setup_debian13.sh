@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 #===============================================================================
-# Script Name       : setup_debian13.sh
+# Script Name       : setup_debian13.sh (COMPILED)
 # Description       : Debian 13 Setup VPS Users, ssh, fail2ban ufw and docker
 # Author            : Rodrigo Sampedro Casis
 # Creation date     : 2025-12-26
-# Version           : 1.1
-# Usage  demo       : ./setup_debian13.sh [--no-menu] [--dry-run]
-# Usage             : ./setup_debian13.sh
+# Version           : 1.0
+# Usage             : ./setup_debian13.sh [--no-menu] [--dry-run]
 #===============================================================================
 set -Eeuo pipefail
 IFS=$'\n\t'
@@ -15,12 +14,14 @@ IFS=$'\n\t'
 # CONFIGURATION
 # =============================================================================
 
+# lib/config.sh - Configuración Global
+
 STATE_FILE="/var/lib/init_phase1.laststep"
 DRY_RUN=false
 
 # --- SSH ---
 SSH_PORT=2222
-SSH_ALLOWED_USERS=( "administrator" "deployer" "ropnom" )
+SSH_ALLOWED_USERS=( "administrator" "deployer" "tuUser" )
 SSH_MAX_AUTH_TRIES=3
 SSH_MAX_SESSIONS=2
 SSH_CLIENT_ALIVE_INTERVAL=300
@@ -31,25 +32,23 @@ SSH_CLIENT_ALIVE_COUNT_MAX=2
 USERS=(
   "administrator:passStrong:"
   "deployer:pass&:"
-  "ropnom:ckpleple38:"
+  "tuUser:pass:"
 )
 
 # --- SUDO POLICIES ---
 # Format: username:rule
 SUDO_RULES=(
   "administrator:ALL=(ALL) NOPASSWD:ALL"
-  "ropnom:ALL=(ALL) ALL"
+  "tuUser:ALL=(ALL) ALL"
   "deployer:ALL=(ALL) NOPASSWD:/usr/local/bin/docker-deploy,/usr/local/bin/docker-manage"
 )
 
 # --- FIREWALL ---
 FIREWALL_ALLOWED_PORTS=(
   "${SSH_PORT}/tcp"
-  "22/tcp"
   "80/tcp"
   "443/tcp"
 )
-
 
 # --- GEO-BLOCKING ---
 BLOCKED_COUNTRIES=("CN" "RU" "KP" "IR" "PK" "BY")
@@ -109,49 +108,11 @@ LOG_FILE="/var/log/init_phase1.log"
 LOG_LEVEL=1  # 0=ERROR, 1=INFO, 2=DEBUG
 
 # =============================================================================
-# STEPS DEFINITION
-# =============================================================================
-STEPS=(
-  check_privileges
-  check_os
-  show_configuration
-  ask_confirmation
-  backup_configs
-  configure_timezone
-  configure_locale
-  configure_apt
-  install_software
-  configure_swap
-  create_docker_deploy_group
-  create_users
-  setup_ssh_keys
-  configure_sudo
-  create_docker_helper_scripts
-  setup_docker_aliases
-  install_docker
-  configure_docker_daemon
-  setup_docker_projects_dir
-  configure_ssh_banner
-  configure_ssh
-  configure_firewall
-  configure_fail2ban
-  setup_geoip_blocking
-  configure_sysctl
-  configure_auditd
-  configure_unattended_upgrades
-  configure_logrotate
-  install_endlessh
-  configure_clamav
-  configure_rkhunter
-  download_fortress_script
-  generate_documentation
-  final_security_check
-)
-STEP_TOTAL="${#STEPS[@]}"
-
-# =============================================================================
 # LOGGING CORE
 # =============================================================================
+
+# lib/logging.sh - Sistema de Logging
+
 log() {
   [[ $LOG_LEVEL -ge 1 ]] && echo -e "[$(date '+%F %T')] [INFO] $*" | tee -a "$LOG_FILE"
 }
@@ -192,6 +153,9 @@ run() {
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
+
+# lib/utils.sh - Utilidades Comunes
+
 load_last_step() {
   [[ -f "$STATE_FILE" ]] && cat "$STATE_FILE" || echo 0
 }
@@ -223,9 +187,6 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-# =============================================================================
-# PRE-FLIGHT CHECKS
-# =============================================================================
 check_privileges() {
   [[ $EUID -eq 0 ]] || fail "Must be executed as root or via sudo"
   ok "Superuser privileges confirmed"
@@ -242,7 +203,7 @@ check_os() {
 show_configuration() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║           CONFIGURATION SUMMARY                           ║"
+  log "║           CONFIGURATION SUMMARY                            ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   log ""
   log "SSH Configuration:"
@@ -281,6 +242,18 @@ show_configuration() {
   log ""
 }
 
+set_or_add() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+
+  if grep -Eq "^#?\s*${key}\b" "$file"; then
+    sed -i "s|^#\?\s*${key}.*|${key} ${value}|" "$file"
+  else
+    echo "${key} ${value}" >> "$file"
+  fi
+}
+
 ask_confirmation() {
   if $DRY_RUN; then
     ok "DRY-RUN mode: skipping confirmation"
@@ -295,8 +268,11 @@ ask_confirmation() {
 }
 
 # =============================================================================
-# BACKUP
+# MODULE: MODULE_SYSTEM
 # =============================================================================
+
+# modules/system.sh - Configuración del Sistema
+
 backup_configs() {
   log "Creating backup of critical configuration files"
   local backup_dir="/root/config_backup_$(date +%Y%m%d_%H%M%S)"
@@ -325,9 +301,6 @@ backup_configs() {
   ok "Configuration backup created in: $backup_dir"
 }
 
-# =============================================================================
-# SYSTEM CONFIGURATION
-# =============================================================================
 configure_timezone() {
   log "Configuring timezone to ${TIMEZONE}"
   run timedatectl set-timezone "$TIMEZONE"
@@ -408,28 +381,83 @@ configure_swap() {
   ok "Swap configured and enabled"
 }
 
-# =============================================================================
-# DOCKER DEPLOY GROUP
-# =============================================================================
-create_docker_deploy_group() {
-  log "Creating docker_deploy group for shared Docker projects"
+configure_sysctl() {
+  log "Configuring kernel parameters (sysctl)"
   
   if $DRY_RUN; then
-    log "[DRY-RUN] Would create group: ${DOCKER_DEPLOY_GROUP}"
+    log "[DRY-RUN] Would configure sysctl"
     return 0
   fi
   
-  if getent group "${DOCKER_DEPLOY_GROUP}" >/dev/null; then
-    ok "Group ${DOCKER_DEPLOY_GROUP} already exists"
-  else
-    groupadd "${DOCKER_DEPLOY_GROUP}"
-    ok "Group ${DOCKER_DEPLOY_GROUP} created"
+  local f="/etc/sysctl.d/99-hardening.conf"
+  : > "$f"
+  
+  for k in "${!SYSCTL_CONF[@]}"; do
+    echo "$k=${SYSCTL_CONF[$k]}" >> "$f"
+  done
+  
+  run sysctl --system
+  ok "Sysctl parameters applied"
+}
+
+configure_unattended_upgrades() {
+  log "Configuring unattended-upgrades"
+  
+  if $DRY_RUN; then
+    log "[DRY-RUN] Would configure unattended-upgrades"
+    return 0
   fi
+  
+  cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'EOF'
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Debian,codename=${distro_codename},label=Debian-Security";
+    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+EOF
+
+  cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+EOF
+
+  ok "Unattended-upgrades configured for security updates"
+}
+
+configure_logrotate() {
+  log "Configuring logrotate for custom applications"
+  
+  if $DRY_RUN; then
+    log "[DRY-RUN] Would configure logrotate"
+    return 0
+  fi
+  
+  cat > /etc/logrotate.d/custom-apps << 'EOF'
+/var/log/init_phase1.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+EOF
+
+  ok "Logrotate configured"
 }
 
 # =============================================================================
-# USER MANAGEMENT
+# MODULE: MODULE_USERS
 # =============================================================================
+
+# modules/users.sh - Gestión de Usuarios
+
 prompt_password() {
   local user="$1"
   local pass1 pass2
@@ -459,6 +487,22 @@ prompt_password() {
   done
 
   printf '%s' "$pass1"
+}
+
+create_docker_deploy_group() {
+  log "Creating docker_deploy group for shared Docker projects"
+  
+  if $DRY_RUN; then
+    log "[DRY-RUN] Would create group: ${DOCKER_DEPLOY_GROUP}"
+    return 0
+  fi
+  
+  if getent group "${DOCKER_DEPLOY_GROUP}" >/dev/null; then
+    ok "Group ${DOCKER_DEPLOY_GROUP} already exists"
+  else
+    groupadd "${DOCKER_DEPLOY_GROUP}"
+    ok "Group ${DOCKER_DEPLOY_GROUP} created"
+  fi
 }
 
 create_users() {
@@ -579,252 +623,129 @@ configure_sudo() {
 }
 
 # =============================================================================
-# DOCKER HELPER SCRIPTS
+# MODULE: MODULE_DOCKER
 # =============================================================================
+
+# Docker installation and deployment helpers.
+
 create_docker_helper_scripts() {
   log "Creating Docker helper scripts"
-  
+
   if $DRY_RUN; then
     log "[DRY-RUN] Would create Docker helper scripts"
     return 0
   fi
-  
-  cat > /usr/local/bin/docker-deploy << 'EOF'
-#!/bin/bash
-# Safe Docker deployment script
-set -e
 
-case "$1" in
-  start)
-    shift
-    docker compose -f "$@" up -d
-    ;;
-  stop)
-    shift
-    docker compose -f "$@" down
-    ;;
-  restart)
-    shift
-    docker compose -f "$@" restart
-    ;;
-  logs)
-    shift
-    docker compose -f "$@" logs -f
-    ;;
-  pull)
-    shift
-    docker compose -f "$@" pull
-    ;;
-  *)
-    echo "Usage: $0 {start|stop|restart|logs|pull} <compose-file>"
-    exit 1
-    ;;
+  cat > /usr/local/bin/docker-deploy <<'EOF'
+
+case "${1:-}" in
+  start) shift; docker compose -f "$@" up -d ;;
+  stop) shift; docker compose -f "$@" down ;;
+  restart) shift; docker compose -f "$@" restart ;;
+  logs) shift; docker compose -f "$@" logs -f ;;
+  pull) shift; docker compose -f "$@" pull ;;
+  *) echo "Usage: $0 {start|stop|restart|logs|pull} <compose-file>" >&2; exit 1 ;;
 esac
 EOF
 
-  cat > /usr/local/bin/docker-manage << 'EOF'
-#!/bin/bash
-# Safe Docker management script
-set -e
+  cat > /usr/local/bin/docker-manage <<'EOF'
 
-case "$1" in
-  ps)
-    shift
-    docker ps "$@"
-    ;;
-  images)
-    docker images
-    ;;
-  prune)
-    docker system prune -f
-    ;;
-  stats)
-    docker stats --no-stream
-    ;;
-  logs)
-    shift
-    docker logs "$@"
-    ;;
-  *)
-    echo "Usage: $0 {ps|images|prune|stats|logs}"
-    exit 1
-    ;;
+case "${1:-}" in
+  ps) shift; docker ps "$@" ;;
+  images) docker images ;;
+  stats) docker stats --no-stream ;;
+  logs) shift; docker logs "$@" ;;
+  *) echo "Usage: $0 {ps|images|stats|logs}" >&2; exit 1 ;;
 esac
 EOF
 
-  chmod 755 /usr/local/bin/docker-deploy
-  chmod 755 /usr/local/bin/docker-manage
-  
-  ok "Docker helper scripts created in /usr/local/bin/"
+  chmod 0755 /usr/local/bin/docker-deploy /usr/local/bin/docker-manage
 }
 
 setup_docker_aliases() {
-  log "Setting up Docker command aliases for users"
-  
+  log "Setting up Docker command aliases"
+
   for entry in "${USERS[@]}"; do
-    IFS=":" read -r user pass sshkey <<<"$entry"
-    
-    if ! id "$user" &>/dev/null; then
-      warn "User $user doesn't exist, skipping alias setup"
+    IFS=":" read -r user _ _ <<<"$entry"
+    if ! id "$user" >/dev/null 2>&1; then
       continue
     fi
-    
     if $DRY_RUN; then
       log "[DRY-RUN] Would setup aliases for $user"
       continue
     fi
-    
-    local user_home
-    user_home=$(eval echo "~$user")
-    local bashrc="$user_home/.bashrc"
-    
-    if grep -q "alias dp=" "$bashrc" 2>/dev/null; then
-      ok "Docker aliases already configured for $user"
-      continue
-    fi
-    
-    cat >> "$bashrc" << 'EOF'
+    blockinfile_marker="# BEGIN DEBIAN SETUP DOCKER ALIASES"
+    if ! grep -qF "$blockinfile_marker" "/home/$user/.bashrc" 2>/dev/null; then
+      cat >> "/home/$user/.bashrc" <<EOF
 
-# Docker helper aliases
+$blockinfile_marker
 alias dp='docker-deploy'
 alias dm='docker-manage'
-
-# Show last login
-if [ -f ~/.last_login ]; then
-    echo "Last login: $(cat ~/.last_login)"
-fi
-echo "$(date '+%Y-%m-%d %H:%M:%S from '$(echo $SSH_CONNECTION | awk '{print $1}'))" > ~/.last_login
+# END DEBIAN SETUP DOCKER ALIASES
 EOF
-    
-    chown "$user:$user" "$bashrc"
-    ok "Docker aliases configured for $user (dp, dm)"
+      chown "$user:$user" "/home/$user/.bashrc"
+    fi
   done
 }
 
-# =============================================================================
-# DOCKER INSTALLATION
-# =============================================================================
 install_docker() {
-  log "Installing Docker from official repository"
-  
+  log "Installing Docker"
+
   if command_exists docker; then
     ok "Docker already installed"
     return 0
   fi
-  
   if $DRY_RUN; then
-    log "[DRY-RUN] Would install Docker"
+    log "[DRY-RUN] Would install Docker packages"
     return 0
   fi
-  
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/debian/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-  
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-  
-  run apt update
-  run apt install -y "${DOCKER_PACKAGES[@]}"
-  
-  systemctl start docker
+
+  run apt-get update
+  run apt-get install -y docker.io docker-compose-plugin
   systemctl enable docker
-  
-  ok "Docker installed and enabled"
+  systemctl start docker
 }
 
 configure_docker_daemon() {
-  log "Configuring Docker daemon for security"
-  
+  log "Configuring Docker daemon"
+
   if $DRY_RUN; then
     log "[DRY-RUN] Would configure Docker daemon"
     return 0
   fi
-  
+
   mkdir -p /etc/docker
-  
-  cat > /etc/docker/daemon.json << 'EOF'
+  cat > /etc/docker/daemon.json <<'EOF'
 {
   "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-ulimits": {
-    "nofile": {
-      "Name": "nofile",
-      "Hard": 64000,
-      "Soft": 64000
-    }
-  },
+  "log-opts": {"max-size": "10m", "max-file": "3"},
   "live-restore": true,
   "userland-proxy": false,
   "no-new-privileges": true
 }
 EOF
-
   systemctl restart docker
-  ok "Docker daemon configured"
 }
 
 setup_docker_projects_dir() {
   log "Setting up Docker projects directory"
-  
+
   if $DRY_RUN; then
     log "[DRY-RUN] Would create ${DOCKER_DEPLOY_BASE_DIR}"
     return 0
   fi
-  
-  if [[ ! -d "$DOCKER_DEPLOY_BASE_DIR" ]]; then
-    mkdir -p "$DOCKER_DEPLOY_BASE_DIR"
-  fi
-  
-  chown root:"${DOCKER_DEPLOY_GROUP}" "$DOCKER_DEPLOY_BASE_DIR"
-  chmod 2775 "$DOCKER_DEPLOY_BASE_DIR"
-  
-  mkdir -p "$DOCKER_DEPLOY_BASE_DIR"/{.env,volumes}
-  chown -R root:"${DOCKER_DEPLOY_GROUP}" "$DOCKER_DEPLOY_BASE_DIR"/{.env,volumes}
-  chmod -R 2775 "$DOCKER_DEPLOY_BASE_DIR"/{.env,volumes}
-  
-  cat > "$DOCKER_DEPLOY_BASE_DIR/README.md" << EOF
-# Docker Projects Directory
 
-This directory is shared among users in the '${DOCKER_DEPLOY_GROUP}' group.
-
-## Structure:
-- \`.env/\` - Environment files for docker-compose
-- \`volumes/\` - Docker volumes data
-- Each project should have its own subdirectory
-
-## Usage:
-- Use 'dp' (docker-deploy) to manage compose files
-- Use 'dm' (docker-manage) for container operations
-
-## Examples:
-\`\`\`bash
-# Start a project
-dp start /path/to/docker-compose.yml
-
-# Check running containers
-dm ps
-
-# View logs
-dm logs container_name
-\`\`\`
-EOF
-  
-  chown root:"${DOCKER_DEPLOY_GROUP}" "$DOCKER_DEPLOY_BASE_DIR/README.md"
-  chmod 664 "$DOCKER_DEPLOY_BASE_DIR/README.md"
-  
-  ok "Docker projects directory configured at ${DOCKER_DEPLOY_BASE_DIR}"
+  install -d -m 2775 -o root -g "$DOCKER_DEPLOY_GROUP" "$DOCKER_DEPLOY_BASE_DIR"
+  install -d -m 2775 -o root -g "$DOCKER_DEPLOY_GROUP" \
+    "$DOCKER_DEPLOY_BASE_DIR/.env" "$DOCKER_DEPLOY_BASE_DIR/volumes"
 }
 
 # =============================================================================
-# SSH BANNER
+# MODULE: MODULE_SECURITY
 # =============================================================================
+
+# modules/security.sh - Seguridad: SSH, Firewall, Fail2ban, Endlessh
+
 configure_ssh_banner() {
   log "Configuring SSH login banner"
   
@@ -835,7 +756,7 @@ configure_ssh_banner() {
   
   cat > "$SSH_BANNER_FILE" << 'EOF'
 ╔═══════════════════════════════════════════════════════════════╗
-║                    AUTHORIZED ACCESS ONLY                     ║
+║                    AUTHORIZED ACCESS ONLY                      ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 WARNING: This system is for authorized users only. 
@@ -857,22 +778,6 @@ EOF
   chmod 644 "$SSH_BANNER_FILE"
   ok "SSH banner created at $SSH_BANNER_FILE"
 }
-
-# =============================================================================
-# SSH HARDENING
-# =============================================================================
-set_or_add() {
-  local key="$1"
-  local value="$2"
-  local file="$3"
-
-  if grep -Eq "^#?\s*${key}\b" "$file"; then
-    sed -i "s|^#\?\s*${key}.*|${key} ${value}|" "$file"
-  else
-    echo "${key} ${value}" >> "$file"
-  fi
-}
-
 
 configure_ssh() {
   log "Hardening SSH configuration"
@@ -901,10 +806,6 @@ configure_ssh() {
   set_or_add "PermitTunnel" "no" "$cfg"
   set_or_add "Banner" "${SSH_BANNER_FILE}" "$cfg"
 
-
-
-
-  
   if ! grep -q "^Ciphers" "$cfg"; then
     set_or_add "Ciphers" "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" "$cfg"
   fi
@@ -938,9 +839,6 @@ configure_ssh() {
   fi
 }
 
-# =============================================================================
-# FIREWALL
-# =============================================================================
 configure_firewall() {
   log "Configuring UFW firewall"
   
@@ -966,9 +864,6 @@ configure_firewall() {
   ok "Firewall configured and enabled"
 }
 
-# =============================================================================
-# FAIL2BAN
-# =============================================================================
 configure_fail2ban() {
   log "Configuring Fail2ban"
   
@@ -1000,9 +895,6 @@ EOF
   ok "Fail2ban configured and enabled"
 }
 
-# =============================================================================
-# GEO-IP BLOCKING
-# =============================================================================
 setup_geoip_blocking() {
   log "Setting up GeoIP blocking for Fail2ban"
   
@@ -1057,125 +949,6 @@ EOF
   ok "GeoIP blocking configured for: ${BLOCKED_COUNTRIES[*]}"
 }
 
-# =============================================================================
-# SYSCTL
-# =============================================================================
-configure_sysctl() {
-  log "Configuring kernel parameters (sysctl)"
-  
-  if $DRY_RUN; then
-    log "[DRY-RUN] Would configure sysctl"
-    return 0
-  fi
-  
-  local f="/etc/sysctl.d/99-hardening.conf"
-  : > "$f"
-  
-  for k in "${!SYSCTL_CONF[@]}"; do
-    echo "$k=${SYSCTL_CONF[$k]}" >> "$f"
-  done
-  
-  run sysctl --system
-  ok "Sysctl parameters applied"
-}
-
-# =============================================================================
-# AUDITD
-# =============================================================================
-configure_auditd() {
-  log "Configuring auditd"
-  
-  if $DRY_RUN; then
-    log "[DRY-RUN] Would configure auditd"
-    return 0
-  fi
-  
-  cat > /etc/audit/rules.d/hardening.rules << 'EOF'
-# Monitor changes to system files
--w /etc/passwd -p wa -k identity
--w /etc/group -p wa -k identity
--w /etc/shadow -p wa -k identity
--w /etc/sudoers -p wa -k sudoers
--w /etc/sudoers.d/ -p wa -k sudoers
-
-# Monitor SSH configuration
--w /etc/ssh/sshd_config -p wa -k sshd
-
-# Monitor Docker
--w /usr/bin/docker -p x -k docker
--w /var/lib/docker -p wa -k docker
-
-# Monitor sudo usage
--a always,exit -F arch=b64 -S execve -F euid=0 -k root_commands
-EOF
-
-  systemctl enable auditd
-  systemctl restart auditd
-  
-  ok "Auditd configured"
-}
-
-# =============================================================================
-# UNATTENDED UPGRADES
-# =============================================================================
-configure_unattended_upgrades() {
-  log "Configuring unattended-upgrades"
-  
-  if $DRY_RUN; then
-    log "[DRY-RUN] Would configure unattended-upgrades"
-    return 0
-  fi
-  
-  cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'EOF'
-Unattended-Upgrade::Origins-Pattern {
-    "origin=Debian,codename=${distro_codename},label=Debian-Security";
-    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
-};
-
-Unattended-Upgrade::AutoFixInterruptedDpkg "true";
-Unattended-Upgrade::MinimalSteps "true";
-Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
-Unattended-Upgrade::Remove-Unused-Dependencies "true";
-Unattended-Upgrade::Automatic-Reboot "false";
-EOF
-
-  cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-APT::Periodic::AutocleanInterval "7";
-EOF
-
-  ok "Unattended-upgrades configured for security updates"
-}
-
-# =============================================================================
-# LOGROTATE
-# =============================================================================
-configure_logrotate() {
-  log "Configuring logrotate for custom applications"
-  
-  if $DRY_RUN; then
-    log "[DRY-RUN] Would configure logrotate"
-    return 0
-  fi
-  
-  cat > /etc/logrotate.d/custom-apps << 'EOF'
-/var/log/init_phase1.log {
-    weekly
-    rotate 4
-    compress
-    delaycompress
-    missingok
-    notifempty
-}
-EOF
-
-  ok "Logrotate configured"
-}
-
-# =============================================================================
-# ENDLESSH (SSH TARPIT) - CORREGIDO
-# =============================================================================
 install_endlessh() {
   log "Installing endlessh SSH tarpit on port 22"
   
@@ -1231,9 +1004,100 @@ EOF
   ok "Endlessh installed and configured on port 22 with CAP_NET_BIND_SERVICE"
 }
 
+restart_and_validate_services() {
+  log ""
+  log "╔═══════════════════════════════════════════════════════════════════════╗"
+  log "║                  RESTARTING AND VALIDATING SERVICES                       ║"
+  log "╚═══════════════════════════════════════════════════════════════════════╝"
+  log ""
+  
+  # Reconfigure SSH
+  log "Reconfiguring SSH service..."
+  configure_ssh
+  
+  # Validate SSH
+  if ss -tlnp | grep -q ":${SSH_PORT}"; then
+    ok "SSH is listening on port ${SSH_PORT}"
+  else
+    warn "SSH is NOT listening on port ${SSH_PORT}"
+  fi
+  
+  # Reconfigure and restart fail2ban
+  log "Reconfiguring Fail2ban..."
+  configure_fail2ban
+  
+  if systemctl is-active --quiet fail2ban; then
+    ok "Fail2ban is active"
+    fail2ban-client status | sed 's/^/  /'
+  else
+    warn "Fail2ban failed to start"
+  fi
+  
+  # Reconfigure and restart UFW
+  log "Reconfiguring UFW firewall..."
+  configure_firewall
+  
+  if ufw status | grep -q "Status: active"; then
+    ok "UFW is active"
+  else
+    warn "UFW is not active"
+  fi
+  
+  # Restart endlessh
+  if systemctl is-active --quiet endlessh; then
+    systemctl restart endlessh
+    ok "Endlessh restarted"
+  fi
+  
+  log ""
+  log "╔═══════════════════════════════════════════════════════════════════════╗"
+  log "║                    SERVICE VALIDATION COMPLETE                            ║"
+  log "╚═══════════════════════════════════════════════════════════════════════╝"
+  log ""
+  log "⚠️  IMPORTANT: Test SSH connection now!"
+  log "   From another terminal: ssh -p ${SSH_PORT} user@$(hostname -I | awk '{print $1}')"
+  log ""
+}
+
 # =============================================================================
-# CLAMAV - CORREGIDO
+# MODULE: MODULE_MONITORING
 # =============================================================================
+
+# modules/monitoring.sh - Monitoreo: ClamAV, Rkhunter, Auditd
+
+configure_auditd() {
+  log "Configuring auditd"
+  
+  if $DRY_RUN; then
+    log "[DRY-RUN] Would configure auditd"
+    return 0
+  fi
+  
+  cat > /etc/audit/rules.d/hardening.rules << 'EOF'
+# Monitor changes to system files
+-w /etc/passwd -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/sudoers -p wa -k sudoers
+-w /etc/sudoers.d/ -p wa -k sudoers
+
+# Monitor SSH configuration
+-w /etc/ssh/sshd_config -p wa -k sshd
+
+# Monitor Docker
+-w /usr/bin/docker -p x -k docker
+-w /var/lib/docker -p wa -k docker
+
+# Monitor sudo usage
+-a always,exit -F arch=b64 -S execve -F euid=0 -k root_commands
+EOF
+
+  systemctl enable auditd
+  systemctl restart auditd
+  
+  ok "Auditd configured"
+}
+
 configure_clamav() {
   log "Configuring ClamAV antivirus"
   
@@ -1275,9 +1139,6 @@ EOF
   ok "ClamAV configured with daily scans at 2 AM and enabled services"
 }
 
-# =============================================================================
-# RKHUNTER
-# =============================================================================
 configure_rkhunter() {
   log "Configuring rkhunter for rootkit detection"
   
@@ -1322,9 +1183,6 @@ EOF
   ok "Rkhunter and chkrootkit configured with weekly scans"
 }
 
-# =============================================================================
-# FORTRESS HARDENING SCRIPT
-# =============================================================================
 download_fortress_script() {
   log "Downloading fortress_improved.sh hardening script"
   
@@ -1350,9 +1208,6 @@ download_fortress_script() {
   fi
 }
 
-# =============================================================================
-# DOCUMENTATION
-# =============================================================================
 generate_documentation() {
   log "Generating setup documentation"
   
@@ -1365,7 +1220,7 @@ generate_documentation() {
   
   cat > "$doc_file" << EOF
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                    DEBIAN 13 VPS SETUP DOCUMENTATION                      ║
+║                    DEBIAN 13 VPS SETUP DOCUMENTATION                       ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Setup Date: $(date '+%Y-%m-%d %H:%M:%S')
@@ -1469,14 +1324,14 @@ To apply additional hardening, run:
   ./fortress_improved.sh -l high -n --explain
 
 After running fortress, reconfigure services with:
-  ./debian13_init.sh (option 7: Reconfigure services)
+  ./setup_debian13.sh (option 7: Reconfigure services)
 
 ═══════════════════════════════════════════════════════════════════════════
 NEXT STEPS
 ═══════════════════════════════════════════════════════════════════════════
 1. Test SSH connection on port ${SSH_PORT} BEFORE closing this session
 2. Run additional hardening: ./fortress_improved.sh -l high -n --explain
-3. Reconfigure services after fortress: ./debian13_init.sh (option 7)
+3. Reconfigure services after fortress: ./setup_debian13.sh (option 7)
 4. Deploy Docker containers in ${DOCKER_DEPLOY_BASE_DIR}
 5. Configure monitoring/alerting as needed
 
@@ -1502,9 +1357,6 @@ EOF
   ok "Documentation generated: $doc_file"
 }
 
-# =============================================================================
-# FINAL CHECKS
-# =============================================================================
 final_security_check() {
   log "Performing final security verification"
   
@@ -1591,70 +1443,15 @@ final_security_check() {
 }
 
 # =============================================================================
-# SERVICE RESTART AND VALIDATION
+# CHECK FUNCTIONS
 # =============================================================================
-restart_and_validate_services() {
-  log ""
-  log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                RESTARTING AND VALIDATING SERVICES                     ║"
-  log "╚═══════════════════════════════════════════════════════════════════════╝"
-  log ""
-  
-  # Reconfigure SSH
-  log "Reconfiguring SSH service..."
-  configure_ssh
-  
-  # Validate SSH
-  if ss -tlnp | grep -q ":${SSH_PORT}"; then
-    ok "SSH is listening on port ${SSH_PORT}"
-  else
-    warn "SSH is NOT listening on port ${SSH_PORT}"
-  fi
-  
-  # Reconfigure and restart fail2ban
-  log "Reconfiguring Fail2ban..."
-  configure_fail2ban
-  
-  if systemctl is-active --quiet fail2ban; then
-    ok "Fail2ban is active"
-    fail2ban-client status | sed 's/^/  /'
-  else
-    warn "Fail2ban failed to start"
-  fi
-  
-  # Reconfigure and restart UFW
-  log "Reconfiguring UFW firewall..."
-  configure_firewall
-  
-  if ufw status | grep -q "Status: active"; then
-    ok "UFW is active"
-  else
-    warn "UFW is not active"
-  fi
-  
-  # Restart endlessh
-  if systemctl is-active --quiet endlessh; then
-    systemctl restart endlessh
-    ok "Endlessh restarted"
-  fi
-  
-  log ""
-  log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    SERVICE VALIDATION COMPLETE                        ║"
-  log "╚═══════════════════════════════════════════════════════════════════════╝"
-  log ""
-  log "⚠️  IMPORTANT: Test SSH connection now!"
-  log "   From another terminal: ssh -p ${SSH_PORT} user@$(hostname -I | awk '{print $1}')"
-  log ""
-}
 
-# =============================================================================
-# CHECK FUNCTIONS (for menu option 2) - ACTUALIZADO
-# =============================================================================
+# modules/checks.sh - Funciones de Verificación del Sistema
+
 check_fail2ban() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║                 FAIL2BAN STATUS                           ║"
+  log "║  FAIL2BAN STATUS                                           ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if ! command_exists fail2ban-client; then
@@ -1677,7 +1474,7 @@ check_fail2ban() {
 check_ssh_logins() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║              RECENT SSH LOGINS (last 24h                  ║"
+  log "║  RECENT SSH LOGINS (last 24h)                              ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if journalctl -u ssh --since "24 hours ago" 2>/dev/null | grep -q "Accepted"; then
@@ -1694,7 +1491,7 @@ check_ssh_logins() {
 check_disk_usage() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  DISK USAGE                                               ║"
+  log "║  DISK USAGE                                                ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   df -h / /var 2>/dev/null | awk 'NR==1 || NR>1 {printf "  %-20s %8s %8s %8s %5s\n", $6, $2, $3, $4, $5}'
@@ -1704,7 +1501,7 @@ check_disk_usage() {
 check_memory_usage() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  MEMORY USAGE                                             ║"
+  log "║  MEMORY USAGE                                              ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   free -h | awk '
@@ -1718,7 +1515,7 @@ check_memory_usage() {
 check_docker_status() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  DOCKER STATUS                                            ║"
+  log "║  DOCKER STATUS                                             ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if ! command_exists docker; then
@@ -1746,7 +1543,7 @@ check_docker_status() {
 check_firewall_status() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  FIREWALL STATUS                                          ║"
+  log "║  FIREWALL STATUS                                           ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   if command_exists ufw; then
@@ -1760,7 +1557,7 @@ check_firewall_status() {
 check_security_updates() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  SECURITY UPDATES                                         ║"
+  log "║  SECURITY UPDATES                                          ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   apt update &>/dev/null
@@ -1779,7 +1576,7 @@ check_security_updates() {
 check_security_services() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║  SECURITY SERVICES                                        ║"
+  log "║  SECURITY SERVICES                                         ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   
   # Check endlessh
@@ -1833,12 +1630,54 @@ run_checks() {
 }
 
 # =============================================================================
+# STEPS DEFINITION
+# =============================================================================
+STEPS=(
+  check_privileges
+  check_os
+  show_configuration
+  ask_confirmation
+  backup_configs
+  configure_timezone
+  configure_locale
+  configure_apt
+  install_software
+  configure_swap
+  create_docker_deploy_group
+  create_users
+  setup_ssh_keys
+  configure_sudo
+  create_docker_helper_scripts
+  setup_docker_aliases
+  install_docker
+  configure_docker_daemon
+  setup_docker_projects_dir
+  configure_ssh_banner
+  configure_ssh
+  configure_firewall
+  configure_fail2ban
+  setup_geoip_blocking
+  configure_sysctl
+  configure_auditd
+  configure_unattended_upgrades
+  configure_logrotate
+  install_endlessh
+  configure_clamav
+  configure_rkhunter
+  download_fortress_script
+  generate_documentation
+  final_security_check
+)
+STEP_TOTAL="${#STEPS[@]}"
+
+
+# =============================================================================
 # MAIN EXECUTION ENGINE
 # =============================================================================
 run_setup() {
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                STARTING VPS SETUP & HARDENING                         ║"
+  log "║                    STARTING VPS SETUP & HARDENING                         ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   
@@ -1871,7 +1710,7 @@ run_setup() {
 
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                ✓ PHASE 1 COMPLETED SUCCESSFULLY                       ║"
+  log "║                    ✓ PHASE 1 COMPLETED SUCCESSFULLY                       ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   log "📄 Documentation: /root/SETUP_INFO.txt"
@@ -1879,13 +1718,7 @@ run_setup() {
   log ""
   log "⚠️  CRITICAL: Test SSH access on port ${SSH_PORT} before closing this session!"
   log ""
-  log "Next: Run additional hardening with:"
-  log "  cd /root && ./fortress_improved.sh -l high -n --explain"
-  log ""
-  log "After fortress, reconfigure services with option 7 in the menu"
-  log ""
   
-  # Clean up state file if in dry-run mode
   if $DRY_RUN && [[ -f "$STATE_FILE" ]]; then
     rm -f "$STATE_FILE"
     log "Dry-run complete - state file removed"
@@ -1932,15 +1765,15 @@ EOF
 done
 
 # =============================================================================
-# MENU - ACTUALIZADO (Exit = 0)
+# MENU
 # =============================================================================
 main_menu() {
   while true; do
     clear
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════════════╗"
-    echo "║                 Debian 13 VPS Init & Hardening                        ║"
-    echo "║                         Version 1.1                                   ║"
+    echo "║                   Debian 13 VPS Init & Hardening                          ║"
+    echo "║                           Version 1.1                                     ║"
     echo "╚═══════════════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  1) 🚀 Run full setup & hardening"

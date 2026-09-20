@@ -10,3 +10,7 @@ ansible/retry/
 ansible/ansible_ssh_known_hosts
 ansible/ssh-keys/
 
+# Compose lab local state
+bash_server/docker-compose/.env
+bash_server/docker-compose/results/
+

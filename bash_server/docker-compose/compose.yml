@@ -1,0 +1,98 @@
+name: debian13-setup-lab
+
+services:
+  ansible-controller:
+    build:
+      context: .
+      dockerfile: dockerfiles/controller.Dockerfile
+    hostname: ansible-controller
+    working_dir: /workspace
+    environment:
+      ANSIBLE_CONFIG: /workspace/lab/ansible.cfg
+      ANSIBLE_LOG_PATH: /workspace/lab/results/ansible.log
+      LAB_BOOTSTRAP_PASSWORD: ${LAB_BOOTSTRAP_PASSWORD:?Run scripts/up.sh first}
+      LAB_VAULT_PASSWORD: ${LAB_VAULT_PASSWORD:?Run scripts/up.sh first}
+    volumes:
+      - ../../ansible:/workspace/ansible:ro
+      - ../../bash_server:/workspace/bash_server:ro
+      - ./inventory:/workspace/lab/inventory:ro
+      - ./scripts:/workspace/lab/scripts:ro
+      - lab-ssh:/root/.ssh
+      - lab-results:/workspace/lab/results
+      - ./fixtures-vault.yml:/workspace/ansible/vars/vault.yml:ro
+    networks:
+      - lab_admin
+    depends_on:
+      debian13-ansible:
+        condition: service_healthy
+      debian13-bash:
+        condition: service_healthy
+    profiles: [lab]
+    command: ["sleep", "infinity"]
+
+  debian13-ansible:
+    build:
+      context: .
+      dockerfile: dockerfiles/target.Dockerfile
+    hostname: debian13-ansible
+    privileged: true
+    environment:
+      LAB_BOOTSTRAP_USER: debian
+      LAB_BOOTSTRAP_PASSWORD: ${LAB_BOOTSTRAP_PASSWORD:?Run scripts/up.sh first}
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - ansible-docker-data:/var/lib/docker
+      - ansible-target-logs:/var/log
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      lab_admin:
+        aliases: [debian13-ansible]
+    healthcheck:
+      test: ["CMD-SHELL", "ss -lnt | grep -q ':22 '"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    profiles: [lab]
+    command: ["/sbin/init"]
+
+  debian13-bash:
+    build:
+      context: .
+      dockerfile: dockerfiles/target.Dockerfile
+    hostname: debian13-bash
+    privileged: true
+    environment:
+      LAB_BOOTSTRAP_USER: debian
+      LAB_BOOTSTRAP_PASSWORD: ${LAB_BOOTSTRAP_PASSWORD:?Run scripts/up.sh first}
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - bash-docker-data:/var/lib/docker
+      - bash-target-logs:/var/log
+      - ../../bash_server:/workspace/bash_server:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      lab_admin:
+        aliases: [debian13-bash]
+    healthcheck:
+      test: ["CMD-SHELL", "ss -lnt | grep -q ':22 '"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    profiles: [lab]
+    command: ["/sbin/init"]
+
+networks:
+  lab_admin:
+    driver: bridge
+
+volumes:
+  lab-ssh:
+  lab-results:
+  ansible-docker-data:
+  ansible-target-logs:
+  bash-docker-data:
+  bash-target-logs:

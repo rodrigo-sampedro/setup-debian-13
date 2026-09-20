@@ -1,0 +1,11 @@
+all:
+  children:
+    vps_servers:
+      hosts:
+        debian13-ansible:
+          ansible_host: debian13-ansible
+          ansible_port: 22
+          ansible_user: debian
+          ansible_python_interpreter: /usr/bin/python3
+          ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+          exposure_class: internal

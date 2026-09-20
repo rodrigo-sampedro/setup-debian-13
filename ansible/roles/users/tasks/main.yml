@@ -19,6 +19,16 @@
   loop: "{{ system_users }}"
   no_log: yes
 
+- name: Ensure key-only users are not account-locked
+  user:
+    name: "{{ item.name }}"
+    password_lock: false
+  loop: "{{ system_users }}"
+  when:
+    - not item.password_lock | default(true)
+    - item.password_hash is not defined
+  no_log: yes
+
 - name: Setup SSH directories
   file:
     path: "/home/{{ item.name }}/.ssh"

@@ -35,3 +35,4 @@ bootstrap_mode: true
 ssh_keys_verified: false
 ssh_hardening_enabled: false
 bootstrap_deployer_root: true
+run_validation: false

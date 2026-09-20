@@ -105,7 +105,7 @@ configure_swap() {
   swapon "$SWAP_FILE"
   
   if ! grep -q "$SWAP_FILE" /etc/fstab; then
-    echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab"
+    echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab
   fi
   
   ok "Swap configured and enabled"

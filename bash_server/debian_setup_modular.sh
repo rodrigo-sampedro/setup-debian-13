@@ -36,12 +36,12 @@ source "${SCRIPT_DIR}/lib/logging.sh"
 source "${SCRIPT_DIR}/lib/utils.sh"
 
 # Cargar módulos
-source "${SCRIPT_DIR}/modules/system.sh"
-source "${SCRIPT_DIR}/modules/users.sh"
-source "${SCRIPT_DIR}/modules/docker.sh"
-source "${SCRIPT_DIR}/modules/security.sh"
-source "${SCRIPT_DIR}/modules/monitoring.sh"
-source "${SCRIPT_DIR}/modules/checks.sh"
+source "${SCRIPT_DIR}/modules/module_system.sh"
+source "${SCRIPT_DIR}/modules/module_users.sh"
+source "${SCRIPT_DIR}/modules/module_docker.sh"
+source "${SCRIPT_DIR}/modules/module_security.sh"
+source "${SCRIPT_DIR}/modules/module_monitoring.sh"
+source "${SCRIPT_DIR}/modules/module_checks.sh"
 
 # =============================================================================
 # STEPS DEFINITION

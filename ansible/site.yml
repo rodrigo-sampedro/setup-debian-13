@@ -108,6 +108,7 @@
         name: validation
         tasks_from: security_check
       tags: ['always']
+      when: run_validation | bool
 
     - name: Display completion message
       debug:
@@ -127,4 +128,6 @@
           - "  2. Run fortress hardening (optional)"
           - "  3. Deploy your Docker applications"
       tags: always
-      when: not ansible_check_mode
+      when:
+        - not ansible_check_mode
+        - run_validation | bool

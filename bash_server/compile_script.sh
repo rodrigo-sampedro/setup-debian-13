@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_FILE="setup_debian13_compiled.sh"
+OUTPUT_FILE="$SCRIPT_DIR/compiled/setup_debian13.sh"
 VERSION="1.1"
 
 echo "═══════════════════════════════════════════════════════════════"
@@ -29,12 +29,12 @@ REQUIRED_FILES=(
     "lib/config.sh"
     "lib/logging.sh"
     "lib/utils.sh"
-    "modules/system.sh"
-    "modules/users.sh"
-    "modules/docker.sh"
-    "modules/security.sh"
-    "modules/monitoring.sh"
-    "modules/checks.sh"
+    "modules/module_system.sh"
+    "modules/module_users.sh"
+    "modules/module_docker.sh"
+    "modules/module_security.sh"
+    "modules/module_monitoring.sh"
+    "modules/module_checks.sh"
 )
 
 echo "🔍 Checking required files..."
@@ -49,6 +49,8 @@ echo ""
 
 echo "🔨 Compiling script..."
 echo ""
+
+mkdir -p "$(dirname "$OUTPUT_FILE")"
 
 # Crear archivo de salida con header
 cat > "$OUTPUT_FILE" << 'HEADER'
@@ -101,8 +103,8 @@ extract_content "$SCRIPT_DIR/lib/utils.sh" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # Añadir módulos
-for module in system users docker security monitoring; do
-    if [[ -f "$SCRIPT_DIR/modules/${module}.sh" ]]; then
+for module in module_system module_users module_docker module_security module_monitoring; do
+  if [[ -f "$SCRIPT_DIR/modules/${module}.sh" ]]; then
         echo "# =============================================================================" >> "$OUTPUT_FILE"
         echo "# MODULE: $(echo $module | tr '[:lower:]' '[:upper:]')" >> "$OUTPUT_FILE"
         echo "# =============================================================================" >> "$OUTPUT_FILE"
@@ -117,7 +119,7 @@ echo "# ========================================================================
 echo "# CHECK FUNCTIONS" >> "$OUTPUT_FILE"
 echo "# =============================================================================" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
-extract_content "$SCRIPT_DIR/modules/checks.sh" >> "$OUTPUT_FILE"
+extract_content "$SCRIPT_DIR/modules/module_checks.sh" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # Añadir el main del script original
