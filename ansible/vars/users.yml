@@ -1,37 +1,26 @@
 ---
 # vars/users.yml - User management configuration
 
-# SSH Allowed Users
+# SSH Allowed Users. administrator is deliberately excluded from direct SSH.
 ssh_allowed_users:
-  - administrator
   - deployer
   - tuUser
 
-# Users to Create
-# Password can be:
-#   - Plain text (will be hashed)
-#   - Pre-hashed (starts with $6$ for SHA-512)
-#   - Vault encrypted variable name
+# Users are created without password defaults. Authorized keys and optional
+# password hashes must come from encrypted Vault variables or host-local input.
 system_users:
   - name: administrator
-    password: "{{ vault_administrator_password | default('passStrong') }}"
-    groups:
-      - "{{ docker_deploy_group }}"
-      - sudo
+    password_lock: true
+    groups: []
+    authorized_keys: "{{ vault_administrator_authorized_keys | default([]) }}"
     ssh_key_url: ""
     shell: /bin/bash
     
   - name: deployer
-    password: "{{ vault_deployer_password | default('pass&') }}"
+    password_lock: true
     groups:
       - "{{ docker_deploy_group }}"
-    ssh_key_url: ""
-    shell: /bin/bash
-    
-  - name: tuUser
-    password: "{{ vault_tuuser_password | default('pass') }}"
-    groups:
-      - "{{ docker_deploy_group }}"
+    authorized_keys: "{{ vault_deployer_authorized_keys | default([]) }}"
     ssh_key_url: ""
     shell: /bin/bash
 
@@ -43,13 +32,11 @@ system_users:
 sudo_policies:
   - user: administrator
     policy: NOPASSWD_ALL
-    
   - user: deployer
-    policy: DOCKER_ONLY
+    policy: "{{ 'NOPASSWD_ALL' if bootstrap_deployer_root else 'DOCKER_ONLY' }}"
     commands:
       - /usr/local/bin/docker-deploy
       - /usr/local/bin/docker-manage
-    
   - user: tuUser
     policy: ALL
 

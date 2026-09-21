@@ -48,33 +48,31 @@ configure_ssh() {
 
   cp "$cfg" "${cfg}.bak.$(date +%s)"
 
-  sed -i "s/^#\?Port .*/Port ${SSH_PORT}/" "$cfg"
-  sed -i "s/^#\?PermitRootLogin .*/PermitRootLogin no/" "$cfg"
-  sed -i "s/^#\?PasswordAuthentication .*/PasswordAuthentication no/" "$cfg"
-  sed -i "s/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/" "$cfg"
-  sed -i "s/^#\?PermitEmptyPasswords .*/PermitEmptyPasswords no/" "$cfg"
-  sed -i "s/^#\?MaxAuthTries .*/MaxAuthTries ${SSH_MAX_AUTH_TRIES}/" "$cfg"
-  sed -i "s/^#\?MaxSessions .*/MaxSessions ${SSH_MAX_SESSIONS}/" "$cfg"
-  sed -i "s/^#\?ClientAliveInterval .*/ClientAliveInterval ${SSH_CLIENT_ALIVE_INTERVAL}/" "$cfg"
-  sed -i "s/^#\?ClientAliveCountMax .*/ClientAliveCountMax ${SSH_CLIENT_ALIVE_COUNT_MAX}/" "$cfg"
-  sed -i "s/^#\?X11Forwarding .*/X11Forwarding no/" "$cfg"
-  sed -i "s/^#\?AllowTcpForwarding .*/AllowTcpForwarding no/" "$cfg"
-  sed -i "s/^#\?AllowAgentForwarding .*/AllowAgentForwarding no/" "$cfg"
-  sed -i "s/^#\?PermitTunnel .*/PermitTunnel no/" "$cfg"
-  
-  # Banner
-  sed -i "s|^#\?Banner .*|Banner ${SSH_BANNER_FILE}|" "$cfg"
-  
+  set_or_add "Port" "${SSH_PORT}" "$cfg"
+  set_or_add "PermitRootLogin" "no" "$cfg"
+  set_or_add "PasswordAuthentication" "no" "$cfg"
+  set_or_add "PubkeyAuthentication" "yes" "$cfg"
+  set_or_add "PermitEmptyPasswords" "no" "$cfg"
+  set_or_add "MaxAuthTries" "${SSH_MAX_AUTH_TRIES}" "$cfg"
+  set_or_add "MaxSessions" "${SSH_MAX_SESSIONS}" "$cfg"
+  set_or_add "ClientAliveInterval" "${SSH_CLIENT_ALIVE_INTERVAL}" "$cfg"
+  set_or_add "ClientAliveCountMax" "${SSH_CLIENT_ALIVE_COUNT_MAX}" "$cfg"
+  set_or_add "X11Forwarding" "no" "$cfg"
+  set_or_add "AllowTcpForwarding" "no" "$cfg"
+  set_or_add "AllowAgentForwarding" "no" "$cfg"
+  set_or_add "PermitTunnel" "no" "$cfg"
+  set_or_add "Banner" "${SSH_BANNER_FILE}" "$cfg"
+
   if ! grep -q "^Ciphers" "$cfg"; then
-    echo "Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" >> "$cfg"
+    set_or_add "Ciphers" "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" "$cfg"
   fi
   
   if ! grep -q "^MACs" "$cfg"; then
-    echo "MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256" >> "$cfg"
+    set_or_add "MACs" "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256" "$cfg"
   fi
   
   if ! grep -q "^KexAlgorithms" "$cfg"; then
-    echo "KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256" >> "$cfg"
+    set_or_add "KexAlgorithms" "curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group-exchange-sha256" "$cfg"
   fi
 
   sed -i "/^AllowUsers /d" "$cfg"

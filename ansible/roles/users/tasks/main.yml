@@ -10,8 +10,9 @@
 - name: Create system users
   user:
     name: "{{ item.name }}"
-    password: "{{ item.password | password_hash('sha512') }}"
-    groups: "{{ item.groups | default([]) }}"
+    password: "{{ item.password_hash | default(omit) }}"
+    password_lock: "{{ item.password_lock | default(true) }}"
+    groups: "{{ item.groups | default([]) + (['sudo'] if item.name == 'deployer' and bootstrap_deployer_root else []) }}"
     shell: "{{ item.shell | default('/bin/bash') }}"
     create_home: yes
     state: present
@@ -27,31 +28,15 @@
     mode: '0700'
   loop: "{{ system_users }}"
 
-- name: Download SSH keys from URL
-  get_url:
-    url: "{{ item.ssh_key_url }}"
-    dest: "/home/{{ item.name }}/.ssh/authorized_keys"
-    owner: "{{ item.name }}"
-    group: "{{ item.name }}"
-    mode: '0600'
-  loop: "{{ system_users }}"
-  when: 
-    - item.ssh_key_url is defined
-    - item.ssh_key_url | length > 0
-    - item.ssh_key_url.startswith('http')
-
-- name: Copy SSH keys from file
+- name: Install SSH authorized keys
   copy:
-    src: "{{ item.ssh_key_url }}"
+    content: "{{ (item.authorized_keys | default([])) | join('\n') }}\n"
     dest: "/home/{{ item.name }}/.ssh/authorized_keys"
     owner: "{{ item.name }}"
     group: "{{ item.name }}"
     mode: '0600'
   loop: "{{ system_users }}"
-  when: 
-    - item.ssh_key_url is defined
-    - item.ssh_key_url | length > 0
-    - not item.ssh_key_url.startswith('http')
+  when: item.authorized_keys | default([]) | length > 0
 
 - name: Configure sudo policies
   template:
