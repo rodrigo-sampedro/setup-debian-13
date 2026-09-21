@@ -13,7 +13,7 @@ configure_ssh_banner() {
   
   cat > "$SSH_BANNER_FILE" << 'EOF'
 ╔═══════════════════════════════════════════════════════════════╗
-║                    AUTHORIZED ACCESS ONLY                      ║
+║                   AUTHORIZED ACCESS ONLY                      ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 WARNING: This system is for authorized users only. 
@@ -266,7 +266,7 @@ EOF
 restart_and_validate_services() {
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                  RESTARTING AND VALIDATING SERVICES                       ║"
+  log "║               RESTARTING AND VALIDATING SERVICES                      ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   
@@ -310,7 +310,7 @@ restart_and_validate_services() {
   
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    SERVICE VALIDATION COMPLETE                            ║"
+  log "║                   SERVICE VALIDATION COMPLETE                         ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   log "⚠️  IMPORTANT: Test SSH connection now!"

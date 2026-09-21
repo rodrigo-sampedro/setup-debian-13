@@ -174,7 +174,7 @@ cat >> "$OUTPUT_FILE" << 'MAIN'
 run_setup() {
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    STARTING VPS SETUP & HARDENING                         ║"
+  log "║                 STARTING VPS SETUP & HARDENING                        ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   
@@ -207,7 +207,7 @@ run_setup() {
 
   log ""
   log "╔═══════════════════════════════════════════════════════════════════════╗"
-  log "║                    ✓ PHASE 1 COMPLETED SUCCESSFULLY                       ║"
+  log "║                 ✓ PHASE 1 COMPLETED SUCCESSFULLY                      ║"
   log "╚═══════════════════════════════════════════════════════════════════════╝"
   log ""
   log "📄 Documentation: /root/SETUP_INFO.txt"
@@ -269,8 +269,8 @@ main_menu() {
     clear
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════════════╗"
-    echo "║                   Debian 13 VPS Init & Hardening                          ║"
-    echo "║                           Version 1.1                                     ║"
+    echo "║                Debian 13 VPS Init & Hardening                         ║"
+    echo "║                        Version 1.1                                    ║"
     echo "╚═══════════════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  1) 🚀 Run full setup & hardening"

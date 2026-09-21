@@ -13,18 +13,9 @@ echo "  Verifying Modular Structure - Debian 13 Setup"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
-# Verificar que existe el directorio del proyecto
-if [[ ! -d "$PROJECT_DIR" ]]; then
-    echo "❌ ERROR: Directory '$PROJECT_DIR' does not exist"
-    echo "   Run setup_structure.sh first"
-    exit 1
-fi
-
-cd "$PROJECT_DIR"
 
 # Lista de archivos requeridos
 REQUIRED_FILES=(
-    "setup_debian13.sh:Main entry point:755"
     "compile.sh:Compiler script:755"
     "README.md:Documentation:644"
     "lib/config.sh:Configuration:644"

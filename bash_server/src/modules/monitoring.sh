@@ -158,7 +158,7 @@ generate_documentation() {
   
   cat > "$doc_file" << EOF
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                    DEBIAN 13 VPS SETUP DOCUMENTATION                       ║
+║                    DEBIAN 13 VPS SETUP DOCUMENTATION                      ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Setup Date: $(date '+%Y-%m-%d %H:%M:%S')

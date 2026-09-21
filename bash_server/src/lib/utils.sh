@@ -50,7 +50,7 @@ check_os() {
 show_configuration() {
   log ""
   log "╔═══════════════════════════════════════════════════════════╗"
-  log "║           CONFIGURATION SUMMARY                            ║"
+  log "║           CONFIGURATION SUMMARY                           ║"
   log "╚═══════════════════════════════════════════════════════════╝"
   log ""
   log "SSH Configuration:"

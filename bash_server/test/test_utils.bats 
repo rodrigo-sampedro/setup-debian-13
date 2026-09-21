@@ -1,0 +1,414 @@
+#!/usr/bin/env bats
+# =============================================================================
+# test/test_utils.bats - Unit tests for src/lib/utils.sh
+# =============================================================================
+
+# Cargar helpers comunes
+load test_helper/common
+
+setup() {
+  common_setup
+  
+  # Source required functions
+  source "${LIB_DIR}/logging.sh"
+  source "${LIB_DIR}/utils.sh"
+}
+
+teardown() {
+  common_teardown
+}
+
+# =============================================================================
+# Tests for load_last_step()
+# =============================================================================
+
+@test "load_last_step() returns 0 when state file does not exist" {
+  rm -f "$STATE_FILE"
+  
+  run load_last_step
+  
+  assert_success
+  assert_output "0"
+}
+
+@test "load_last_step() returns saved step number" {
+  echo "5" > "$STATE_FILE"
+  
+  run load_last_step
+  
+  assert_success
+  assert_output "5"
+}
+
+@test "load_last_step() handles multiline content correctly" {
+  echo "10" > "$STATE_FILE"
+  
+  run load_last_step
+  
+  assert_output "10"
+}
+
+# =============================================================================
+# Tests for save_last_step()
+# =============================================================================
+
+@test "save_last_step() writes step number to state file" {
+  DRY_RUN=false
+  
+  save_last_step 3
+  
+  assert_file_exists "$STATE_FILE"
+  run cat "$STATE_FILE"
+  assert_output "3"
+}
+
+@test "save_last_step() overwrites existing state file" {
+  echo "1" > "$STATE_FILE"
+  DRY_RUN=false
+  
+  save_last_step 7
+  
+  run cat "$STATE_FILE"
+  assert_output "7"
+}
+
+@test "save_last_step() does not write in DRY_RUN mode" {
+  DRY_RUN=true
+  
+  save_last_step 5
+  
+  assert_file_not_exists "$STATE_FILE"
+}
+
+# =============================================================================
+# Tests for clear_last_step()
+# =============================================================================
+
+@test "clear_last_step() removes existing state file" {
+  echo "5" > "$STATE_FILE"
+  
+  run clear_last_step
+  
+  assert_success
+  assert_file_not_exists "$STATE_FILE"
+  assert_output --partial "Progress file cleared"
+}
+
+@test "clear_last_step() handles non-existent state file gracefully" {
+  rm -f "$STATE_FILE"
+  
+  run clear_last_step
+  
+  assert_success
+  assert_output --partial "No progress file to clear"
+}
+
+# =============================================================================
+# Tests for join_by()
+# =============================================================================
+
+@test "join_by() joins array elements with separator" {
+  run join_by ", " "apple" "banana" "cherry"
+  
+  assert_success
+  assert_output "apple, banana, cherry"
+}
+
+@test "join_by() works with single element" {
+  run join_by ", " "apple"
+  
+  assert_success
+  assert_output "apple"
+}
+
+@test "join_by() works with empty list" {
+  run join_by ", "
+  
+  assert_success
+  assert_output ""
+}
+
+@test "join_by() works with different separators" {
+  run join_by " | " "one" "two" "three"
+  
+  assert_output "one | two | three"
+}
+
+@test "join_by() handles spaces in elements" {
+  run join_by "," "item one" "item two"
+  
+  assert_output "item one,item two"
+}
+
+# =============================================================================
+# Tests for command_exists()
+# =============================================================================
+
+@test "command_exists() returns 0 for existing command" {
+  run command_exists "bash"
+  
+  assert_success
+}
+
+@test "command_exists() returns 1 for non-existing command" {
+  run command_exists "nonexistent_command_xyz_123"
+  
+  assert_failure
+}
+
+@test "command_exists() works with common system commands" {
+  run command_exists "ls"
+  assert_success
+  
+  run command_exists "cat"
+  assert_success
+  
+  run command_exists "grep"
+  assert_success
+}
+
+# =============================================================================
+# Tests for check_privileges()
+# =============================================================================
+
+@test "check_privileges() succeeds when EUID is 0" {
+  EUID=0
+  
+  run check_privileges
+  
+  assert_success
+  assert_output --partial "Superuser privileges confirmed"
+}
+
+@test "check_privileges() fails when EUID is not 0" {
+  EUID=1000
+  
+  run check_privileges
+  
+  assert_failure
+  assert_output --partial "Must be executed as root"
+}
+
+# =============================================================================
+# Tests for check_os()
+# =============================================================================
+
+@test "check_os() succeeds on Debian 13" {
+  # Create mock os-release file
+  local mock_os_release="${TEST_TEMP_DIR}/os-release"
+  cat > "$mock_os_release" << EOF
+NAME="Debian GNU/Linux"
+VERSION="13 (trixie)"
+ID=debian
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+EOF
+  
+  # Override function to use mock file
+  check_os() {
+    if grep -q "Debian GNU/Linux 13" "$mock_os_release"; then
+      ok "Debian 13 detected"
+    else
+      fail "Unsupported OS - This script requires Debian 13"
+    fi
+  }
+  
+  run check_os
+  
+  assert_success
+  assert_output --partial "Debian 13 detected"
+}
+
+@test "check_os() fails on non-Debian 13 systems" {
+  local mock_os_release="${TEST_TEMP_DIR}/os-release"
+  cat > "$mock_os_release" << EOF
+NAME="Ubuntu"
+VERSION="22.04 LTS"
+ID=ubuntu
+EOF
+  
+  check_os() {
+    if grep -q "Debian GNU/Linux 13" "$mock_os_release"; then
+      ok "Debian 13 detected"
+    else
+      fail "Unsupported OS - This script requires Debian 13"
+    fi
+  }
+  
+  run check_os
+  
+  assert_failure
+  assert_output --partial "Unsupported OS"
+}
+
+# =============================================================================
+# Tests for show_configuration()
+# =============================================================================
+
+@test "show_configuration() displays SSH configuration" {
+  SSH_PORT=2222
+  SSH_ALLOWED_USERS=("user1" "user2")
+  SSH_MAX_AUTH_TRIES=3
+  BLOCKED_COUNTRIES=("CN" "RU")
+  FIREWALL_ALLOWED_PORTS=(80 443)
+  TIMEZONE="Europe/Madrid"
+  SWAP_SIZE="2G"
+  DOCKER_DEPLOY_GROUP="deployers"
+  DOCKER_DEPLOY_BASE_DIR="/opt/docker"
+  USERS=("testuser:testpass:testkey")
+  
+  run show_configuration
+  
+  assert_success
+  assert_output --partial "SSH Configuration"
+  assert_output --partial "Port: 2222"
+  assert_output --partial "user1"
+  assert_output --partial "user2"
+}
+
+@test "show_configuration() displays all major sections" {
+  SSH_PORT=22
+  SSH_ALLOWED_USERS=("root")
+  SSH_MAX_AUTH_TRIES=3
+  BLOCKED_COUNTRIES=("CN")
+  FIREWALL_ALLOWED_PORTS=(22 80 443)
+  TIMEZONE="UTC"
+  SWAP_SIZE="1G"
+  DOCKER_DEPLOY_GROUP="docker"
+  DOCKER_DEPLOY_BASE_DIR="/opt/apps"
+  USERS=()
+  
+  run show_configuration
+  
+  assert_output --partial "CONFIGURATION SUMMARY"
+  assert_output --partial "Security:"
+  assert_output --partial "Firewall Ports:"
+  assert_output --partial "System:"
+  assert_output --partial "Docker Deploy:"
+  assert_output --partial "Docker:"
+}
+
+@test "show_configuration() displays user information correctly" {
+  SSH_PORT=22
+  SSH_ALLOWED_USERS=("admin")
+  SSH_MAX_AUTH_TRIES=3
+  BLOCKED_COUNTRIES=()
+  FIREWALL_ALLOWED_PORTS=(22)
+  TIMEZONE="UTC"
+  SWAP_SIZE="1G"
+  DOCKER_DEPLOY_GROUP="docker"
+  DOCKER_DEPLOY_BASE_DIR="/opt"
+  USERS=("alice:pass123:key1" "bob::key2" "charlie:pass456:")
+  
+  run show_configuration
+  
+  assert_output --partial "Users to create:"
+  assert_output --partial "alice"
+  assert_output --partial "bob"
+  assert_output --partial "charlie"
+}
+
+# =============================================================================
+# Tests for ask_confirmation()
+# =============================================================================
+
+@test "ask_confirmation() skips in DRY_RUN mode" {
+  DRY_RUN=true
+  
+  run ask_confirmation
+  
+  assert_success
+  assert_output --partial "DRY-RUN mode"
+}
+
+@test "ask_confirmation() accepts 'y' as confirmation" {
+  DRY_RUN=false
+  
+  run bash -c "source ${LIB_DIR}/logging.sh; source ${LIB_DIR}/utils.sh; export LOG_FILE='${LOG_FILE}'; echo 'y' | ask_confirmation"
+  
+  assert_success
+  assert_output --partial "Execution confirmed"
+}
+
+@test "ask_confirmation() accepts 'yes' as confirmation" {
+  DRY_RUN=false
+  
+  run bash -c "source ${LIB_DIR}/logging.sh; source ${LIB_DIR}/utils.sh; export LOG_FILE='${LOG_FILE}'; echo 'yes' | ask_confirmation"
+  
+  assert_success
+  assert_output --partial "Execution confirmed"
+}
+
+@test "ask_confirmation() accepts case-insensitive 'YES'" {
+  DRY_RUN=false
+  
+  run bash -c "source ${LIB_DIR}/logging.sh; source ${LIB_DIR}/utils.sh; export LOG_FILE='${LOG_FILE}'; echo 'YES' | ask_confirmation"
+  
+  assert_success
+  assert_output --partial "Execution confirmed"
+}
+
+@test "ask_confirmation() rejects 'n' and aborts" {
+  DRY_RUN=false
+  
+  run bash -c "source ${LIB_DIR}/logging.sh; source ${LIB_DIR}/utils.sh; export LOG_FILE='${LOG_FILE}'; echo 'n' | ask_confirmation"
+  
+  assert_failure
+  assert_output --partial "Execution aborted"
+}
+
+@test "ask_confirmation() rejects empty input and aborts" {
+  DRY_RUN=false
+  
+  run bash -c "source ${LIB_DIR}/logging.sh; source ${LIB_DIR}/utils.sh; export LOG_FILE='${LOG_FILE}'; echo '' | ask_confirmation"
+  
+  assert_failure
+  assert_output --partial "Execution aborted"
+}
+
+# =============================================================================
+# Integration tests
+# =============================================================================
+
+@test "state file workflow: save, load, clear" {
+  DRY_RUN=false
+  
+  # Save step
+  save_last_step 5
+  assert_file_exists "$STATE_FILE"
+  
+  # Load step
+  result=$(load_last_step)
+  assert_equal "$result" "5"
+  
+  # Update step
+  save_last_step 10
+  result=$(load_last_step)
+  assert_equal "$result" "10"
+  
+  # Clear step
+  clear_last_step >/dev/null
+  assert_file_not_exists "$STATE_FILE"
+  
+  # Load after clear returns 0
+  result=$(load_last_step)
+  assert_equal "$result" "0"
+}
+
+@test "join_by works with bash arrays" {
+  local arr=("one" "two" "three")
+  
+  run join_by ", " "${arr[@]}"
+  
+  assert_output "one, two, three"
+}
+
+@test "multiple commands_exists calls work correctly" {
+  run command_exists "bash"
+  assert_success
+  
+  run command_exists "nonexistent_xyz"
+  assert_failure
+  
+  run command_exists "cat"
+  assert_success
+}

@@ -18,7 +18,7 @@ SSH_CLIENT_ALIVE_COUNT_MAX=2
 # Format: username:password(empty=ask):sshkey_url_or_path
 USERS=(
   "administrator:passStrong:"
-  "deployer:pass&:"
+  "deployer:pass:"
   "tuUser:pass:"
 )
 
@@ -33,6 +33,7 @@ SUDO_RULES=(
 # --- FIREWALL ---
 FIREWALL_ALLOWED_PORTS=(
   "${SSH_PORT}/tcp"
+  "22/tcp"
   "80/tcp"
   "443/tcp"
 )
